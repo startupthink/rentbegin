@@ -3,10 +3,12 @@ import { useParams, Link } from 'react-router-dom'
 import Header from '../components/Header'
 import { GRADIENTS, AMENITIES } from '../data/mock'
 import { getListing } from '../api/client'
+import { useSaved } from '../context/SavedContext'
 import './Property.css'
 
 export default function Property() {
   const { id } = useParams()
+  const { isSaved, toggle } = useSaved()
   const [item, setItem] = useState(null)
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState(null)
@@ -85,7 +87,15 @@ export default function Property() {
           <span>· {item.reviewCount} รีวิว ·</span>
           {item.verified && <span className="tg tg-live">✓ เจ้าของยืนยันตัวตนแล้ว</span>}
           <span>· {item.district} {item.province}</span>
-          <span className="dsub-right">♡ บันทึก &nbsp;·&nbsp; ↗ แชร์</span>
+          <span className="dsub-right">
+            <button
+              className={`dsave ${isSaved(item.id) ? 'on' : ''}`}
+              onClick={() => toggle(item.id)}
+            >
+              {isSaved(item.id) ? '♥ บันทึกแล้ว' : '♡ บันทึก'}
+            </button>
+            &nbsp;·&nbsp; ↗ แชร์
+          </span>
         </div>
 
         <div className="gal">

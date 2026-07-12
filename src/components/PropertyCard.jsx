@@ -1,18 +1,20 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { GRADIENTS } from '../data/mock'
+import { useSaved } from '../context/SavedContext'
 import './PropertyCard.css'
 
 export default function PropertyCard({ item, preview = false }) {
   const nav = useNavigate()
-  const [fav, setFav] = useState(false)
+  const { isSaved, toggle } = useSaved()
   const [slide, setSlide] = useState(0)
 
   const photos = item.photos || ['g1']
+  const fav = !preview && isSaved(item.id)
 
   function toggleFav(e) {
     e.stopPropagation()
-    setFav((f) => !f)
+    if (!preview) toggle(item.id)
   }
 
   function open() {
@@ -38,7 +40,8 @@ export default function PropertyCard({ item, preview = false }) {
         <button
           className={`fav ${fav ? 'on' : ''}`}
           onClick={toggleFav}
-          aria-label="บันทึก"
+          aria-label={fav ? 'เอาออกจากที่บันทึก' : 'บันทึก'}
+          title={fav ? 'เอาออกจากที่บันทึก' : 'บันทึกไว้ดูทีหลัง'}
         >
           {fav ? '♥' : '♡'}
         </button>

@@ -1,7 +1,10 @@
 import { Link } from 'react-router-dom'
+import { useSaved } from '../context/SavedContext'
 import './Header.css'
 
 export default function Header({ search }) {
+  const { count } = useSaved()
+
   return (
     <header className="hdr">
       <div className="hdr-in">
@@ -20,6 +23,10 @@ export default function Header({ search }) {
         </div>
 
         <div className="hdr-right">
+          <Link to="/saved" className="hdr-fav" title="ที่บันทึกไว้">
+            ♥
+            {count > 0 && <span className="hdr-fav-n">{count}</span>}
+          </Link>
           <Link to="/member" className="lnk">ปล่อยเช่ากับเรา</Link>
           <Link to="/member" className="acct">
             <span className="bars">☰</span>

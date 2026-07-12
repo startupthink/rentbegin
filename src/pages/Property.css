@@ -12,7 +12,10 @@
   flex-wrap:wrap;margin-bottom:18px;
 }
 .dsub b{color:var(--ink)}
-.dsub-right{margin-left:auto;font-weight:600;color:var(--ink);cursor:pointer}
+.dsub-right{margin-left:auto;font-weight:600;color:var(--ink);cursor:pointer;display:flex;align-items:center}
+.dsave{font-size:14px;font-weight:700;color:var(--ink);padding:4px 8px;border-radius:8px}
+.dsave:hover{background:var(--soft)}
+.dsave.on{color:var(--brand)}
 
 /* ---------- gallery ---------- */
 .gal{
