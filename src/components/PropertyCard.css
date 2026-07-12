@@ -1,0 +1,52 @@
+.card{cursor:pointer}
+.card.is-preview{cursor:default}
+
+.card .ph{
+  position:relative;border-radius:14px;overflow:hidden;
+  aspect-ratio:20/19;margin-bottom:11px;background:var(--soft);
+}
+.card .ph .bg{position:absolute;inset:0;transition:transform .4s}
+.card .ph .bg::after{
+  content:"";position:absolute;inset:0;
+  background:linear-gradient(180deg,rgba(0,0,0,.16) 0%,transparent 30%,transparent 65%,rgba(0,0,0,.14) 100%);
+}
+.card:not(.is-preview):hover .ph .bg{transform:scale(1.04)}
+
+.card .ph .fav{
+  position:absolute;top:12px;right:12px;font-size:22px;line-height:1;
+  color:rgba(255,255,255,.9);text-shadow:0 1px 4px rgba(0,0,0,.3);
+  padding:0;transition:.15s;
+}
+.card .ph .fav.on{color:var(--brand);text-shadow:0 1px 4px rgba(0,0,0,.2)}
+.card .ph .fav:hover{transform:scale(1.12)}
+
+.card .ph .pill{
+  position:absolute;top:12px;left:12px;background:#fff;border-radius:999px;
+  padding:5px 11px;font-size:11.5px;font-weight:700;box-shadow:var(--shadow);
+}
+.card .ph .pill.verified{color:var(--green)}
+.card .ph .pill.hot{background:var(--brand);color:#fff}
+
+.card .ph .dots{
+  position:absolute;bottom:12px;left:50%;transform:translateX(-50%);
+  display:flex;gap:5px;
+}
+.card .ph .dots i{
+  width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.55);
+  cursor:pointer;transition:.15s;
+}
+.card .ph .dots i.on{background:#fff;width:7px;height:7px}
+
+.card .ph .type{
+  position:absolute;bottom:11px;right:12px;
+  background:rgba(0,0,0,.55);backdrop-filter:blur(4px);color:#fff;
+  font-size:11px;font-weight:600;padding:4px 9px;border-radius:8px;
+}
+
+.card .r1{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.card h3{margin:0;font-size:15px;font-weight:700;letter-spacing:-.01em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.card .star{font-size:13.5px;font-weight:600;flex:none}
+.card .meta{font-size:13.5px;color:var(--sub);margin:2px 0 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.card .spec{font-size:13.5px;color:var(--sub);margin:1px 0 6px}
+.card .cost{font-size:15px;font-weight:700;margin:0}
+.card .cost span{font-weight:500;color:var(--sub)}
