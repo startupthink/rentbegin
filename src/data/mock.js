@@ -500,3 +500,69 @@ export const adminDisputes = [
   { id: 'RB-2887', title: 'มัดจำไม่คืน', detail: 'ทาวน์เฮาส์ ปากเกร็ด · หักมัดจำเกิน', status: 'wait', statusLabel: 'เจรจา' },
   { id: 'RB-2860', title: 'นายหน้าไม่มีสิทธิ์', detail: 'ลงประกาศทรัพย์ที่ไม่ได้รับมอบอำนาจ', status: 'wait', statusLabel: 'ตรวจสอบ' },
 ]
+
+// ==================== patch02: ข้อมูลหน้าย่อยใน dashboard ====================
+
+export const memberMessages = [
+  {
+    id: 'M-1', from: 'คุณเอ', photo: 'g3', property: 'ทาวน์เฮาส์ ปากเกร็ด', unread: 2, time: '2 ชม.',
+    msgs: [
+      { me: false, text: 'สวัสดีค่ะ ห้องนี้เลี้ยงแมวได้ไหมคะ' },
+      { me: false, text: 'มีแมว 1 ตัวค่ะ ตัวเล็ก' },
+    ],
+  },
+  {
+    id: 'M-2', from: 'คุณพิม', photo: 'g1', property: 'The Base รัชดา', unread: 1, time: '5 ชม.',
+    msgs: [{ me: false, text: 'พรุ่งนี้ขอเลื่อนนัดชมเป็น 15:00 ได้ไหมคะ' }],
+  },
+  {
+    id: 'M-3', from: 'คุณต้น', photo: 'g2', property: 'บ้านเดี่ยว นนท์', unread: 1, time: 'เมื่อวาน',
+    msgs: [{ me: false, text: 'ค่าส่วนกลางรวมในค่าเช่าแล้วหรือยังครับ' }],
+  },
+  {
+    id: 'M-4', from: 'คุณแนน', photo: 'g5', property: 'Ideo Mobi', unread: 0, time: 'เมื่อวาน',
+    msgs: [
+      { me: false, text: 'ขอบคุณค่ะ เจอกันพรุ่งนี้นะคะ' },
+      { me: true, text: 'ยินดีครับ เจอกัน 16:00 ครับ' },
+    ],
+  },
+]
+
+export const memberContracts = [
+  { id: 'C-2201', property: 'ทาวน์เฮาส์ พร้อมเฟอร์ฯ', tenant: 'คุณกิ๊ก', start: '1 มี.ค. 2568', months: 12, rent: 16500, status: 'active' },
+  { id: 'C-2188', property: 'Lumpini Ville แต่งครบ', tenant: 'คุณบอล', start: '15 ม.ค. 2568', months: 12, rent: 9500, status: 'active' },
+  { id: 'C-2140', property: 'Ideo Mobi สตูดิโอ', tenant: 'คุณเมย์', start: '1 พ.ย. 2567', months: 6, rent: 12500, status: 'ending' },
+]
+
+export const memberTransactions = [
+  { id: 'T-901', date: '20 มิ.ย. 2568', desc: 'ค่าเช่า มิ.ย. — ทาวน์เฮาส์ ปากเกร็ด', amount: 16500, type: 'in' },
+  { id: 'T-899', date: '16 มิ.ย. 2568', desc: 'ค่าเช่า มิ.ย. — Lumpini Ville', amount: 9500, type: 'in' },
+  { id: 'T-897', date: '15 มิ.ย. 2568', desc: 'มัดจำเข้าระบบพักเงิน — The Base รัชดา', amount: 30000, type: 'hold' },
+  { id: 'T-885', date: '2 มิ.ย. 2568', desc: 'ค่าธรรมเนียมแพลตฟอร์ม พ.ค.', amount: -590, type: 'out' },
+]
+
+export const memberReceipts = [
+  { id: 'RC-3320', date: '20 มิ.ย. 2568', desc: 'ใบเสร็จค่าเช่า มิ.ย. — ทาวน์เฮาส์ ปากเกร็ด', amount: 16500 },
+  { id: 'RC-3311', date: '16 มิ.ย. 2568', desc: 'ใบเสร็จค่าเช่า มิ.ย. — Lumpini Ville', amount: 9500 },
+  { id: 'RC-3290', date: '20 พ.ค. 2568', desc: 'ใบเสร็จค่าเช่า พ.ค. — ทาวน์เฮาส์ ปากเกร็ด', amount: 16500 },
+]
+
+export const memberReviewsList = [
+  { id: 'R-1', name: 'คุณกิ๊ก', stars: 5, text: 'เจ้าของใจดีมาก ตอบไว ห้องตรงปกทุกอย่าง', time: '2 สัปดาห์ก่อน', property: 'ทาวน์เฮาส์ ปากเกร็ด' },
+  { id: 'R-2', name: 'คุณบอล', stars: 5, text: 'สัญญาชัดเจน คืนมัดจำครบถ้วน แนะนำครับ', time: '1 เดือนก่อน', property: 'Lumpini Ville' },
+  { id: 'R-3', name: 'คุณเมย์', stars: 4, text: 'ห้องสวยตรงรูป ติดแค่ที่จอดรถแน่นช่วงเย็น', time: '2 เดือนก่อน', property: 'Ideo Mobi' },
+]
+
+export const adminKycQueue = [
+  { id: 'U-441', name: 'คุณอรุณ', role: 'เจ้าของ', doc: 'บัตรประชาชน + โฉนดที่ดิน', time: '1 ชม.ที่แล้ว', photo: 'g7' },
+  { id: 'U-438', name: 'บ้านดีพร็อพเพอร์ตี้', role: 'นายหน้า', doc: 'บัตรประชาชน + หนังสือมอบอำนาจ', time: '3 ชม.ที่แล้ว', photo: 'g6' },
+  { id: 'U-433', name: 'คุณสมชาย', role: 'เจ้าของ', doc: 'บัตรประชาชน + สัญญาซื้อขาย', time: '6 ชม.ที่แล้ว', photo: 'g3' },
+]
+
+export const adminMembersList = [
+  { id: 'U-101', name: 'คุณนภา', role: 'เจ้าของ', joined: 'มี.ค. 2566', listings: 4, status: 'active' },
+  { id: 'U-103', name: 'วีระ พร็อพเพอร์ตี้', role: 'นายหน้า', joined: 'ส.ค. 2566', listings: 9, status: 'active' },
+  { id: 'U-102', name: 'คุณสมชาย', role: 'เจ้าของ', joined: 'ม.ค. 2567', listings: 2, status: 'active' },
+  { id: 'U-104', name: 'คุณอรุณ', role: 'เจ้าของ', joined: 'พ.ค. 2568', listings: 2, status: 'active' },
+  { id: 'U-097', name: 'ห้องสวยพร็อพ', role: 'นายหน้า', joined: 'ก.พ. 2567', listings: 6, status: 'suspended' },
+]

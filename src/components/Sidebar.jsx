@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom'
 import './Sidebar.css'
 
-export default function Sidebar({ variant = 'member', profile, items, active }) {
+// patch02: เมนูกดได้จริง — ส่ง onSelect(id) กลับไปให้หน้า dashboard สลับแท็บ
+export default function Sidebar({ variant = 'member', profile, items, active, onSelect }) {
   const isAdmin = variant === 'admin'
 
   return (
@@ -33,7 +34,11 @@ export default function Sidebar({ variant = 'member', profile, items, active }) 
           it.group ? (
             <div key={`g${i}`} className="gp">{it.group}</div>
           ) : (
-            <a key={it.id} className={it.id === active ? 'on' : ''}>
+            <a
+              key={it.id}
+              className={it.id === active ? 'on' : ''}
+              onClick={() => onSelect?.(it.id)}
+            >
               <span className="i">{it.icon}</span>
               {it.label}
               {it.count ? <span className="c">{it.count}</span> : null}

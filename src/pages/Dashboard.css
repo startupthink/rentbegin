@@ -150,3 +150,53 @@
   .lrow .num{min-width:auto}
   .steps{flex-direction:column}
 }
+
+/* ==================== patch02 ==================== */
+
+/* header อยู่บน dashboard แล้ว — ลดความสูงขั้นต่ำลง */
+.app{min-height:calc(100vh - 77px)}
+.side{min-height:calc(100vh - 77px)}
+
+/* ---------- แชต ---------- */
+.chatwrap{display:grid;grid-template-columns:300px 1fr;min-height:480px;padding:0}
+.threads{border-right:1px solid var(--line);overflow-y:auto}
+.thread{display:flex;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line);cursor:pointer;align-items:center}
+.thread:hover{background:var(--soft)}
+.thread.on{background:#fff0f0}
+.thread .th{width:42px;height:42px;border-radius:10px;flex:none}
+.thread .t{font-size:13.5px;font-weight:700}
+.thread .s{font-size:12px;color:var(--sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px}
+
+.chatpane{display:flex;flex-direction:column;min-height:480px}
+.chathead{padding:14px 16px;border-bottom:1px solid var(--line);font-size:14px}
+.chathead span{color:var(--sub)}
+.chatlog{flex:1;padding:16px;display:flex;flex-direction:column;gap:8px;overflow-y:auto;background:var(--soft)}
+.bub{max-width:70%;padding:9px 13px;border-radius:14px;font-size:13.5px;background:#fff;border:1px solid var(--line);align-self:flex-start}
+.bub.me{align-self:flex-end;background:var(--brand);border-color:var(--brand);color:#fff}
+.chatin{display:flex;gap:8px;padding:12px;border-top:1px solid var(--line);background:#fff}
+.chatin input{flex:1;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:14px;outline:none;font-family:inherit}
+.chatin input:focus{border-color:var(--brand)}
+
+/* badge ใช้ร่วมกับ thread */
+.up-badge{
+  background:var(--brand);color:#fff;font-size:10.5px;font-weight:800;
+  padding:1px 7px;border-radius:999px;flex:none;
+}
+
+/* ---------- ตาราง ---------- */
+.tbl{width:100%;border-collapse:collapse;font-size:13.5px}
+.tbl th{
+  text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em;
+  color:var(--sub);font-weight:700;padding:10px 16px;background:var(--soft);
+  border-bottom:1px solid var(--line);white-space:nowrap;
+}
+.tbl td{padding:12px 16px;border-bottom:1px solid var(--line);vertical-align:middle}
+.tbl tr:last-child td{border-bottom:0}
+.tbl tr:hover td{background:var(--soft)}
+.amt-in{color:var(--green);font-weight:700}
+.amt-out{color:var(--red);font-weight:700}
+
+/* ---------- รีวิว ---------- */
+.rvw{padding:14px 18px;border-bottom:1px solid var(--line)}
+.rvw:last-child{border-bottom:0}
+.stars{color:#f2a33c;letter-spacing:2px;font-size:13px}
