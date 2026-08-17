@@ -1,13 +1,11 @@
 import { useEffect, useState } from 'react'
 import Header from '../components/Header'
 import Sidebar from '../components/Sidebar'
-import {
-  GRADIENTS, listings as allListings,
-  adminKycQueue, adminMembersList, memberContracts,
-} from '../data/mock'
+import { GRADIENTS } from '../data/mock'
 import {
   getAdminStats, getReviewQueue, getDisputes,
   approveListing, rejectListing,
+  getAdminKyc, getAdminMembers, getAdminListings, getAdminContracts,
 } from '../api/client'
 import './Dashboard.css'
 
@@ -168,7 +166,8 @@ function ReviewTab({ queue, busy, handle }) {
 }
 
 function KycTab() {
-  const [items, setItems] = useState(adminKycQueue)
+  const [items, setItems] = useState([])
+  useEffect(() => { let a = true; getAdminKyc().then((d) => a && setItems(d || [])); return () => { a = false } }, [])
   const act = (id) => setItems((s) => s.filter((x) => x.id !== id))
   return (
     <>
@@ -218,7 +217,8 @@ function DisputesTab({ initial }) {
 }
 
 function MembersTab() {
-  const [items, setItems] = useState(adminMembersList)
+  const [items, setItems] = useState([])
+  useEffect(() => { let a = true; getAdminMembers().then((d) => a && setItems(d || [])); return () => { a = false } }, [])
   const toggle = (id) => setItems((s) => s.map((m) => m.id === id ? { ...m, status: m.status === 'active' ? 'suspended' : 'active' } : m))
   return (
     <>
@@ -241,21 +241,32 @@ function MembersTab() {
   )
 }
 
+const LST_STATUS = {
+  live: { cls: 'tg-live', label: 'เผยแพร่' },
+  pending: { cls: 'tg-wait', label: 'รอตรวจ' },
+  rented: { cls: 'tg-off', label: 'เช่าแล้ว' },
+  rejected: { cls: 'tg-danger', label: 'ตีกลับ' },
+}
 function AllListingsTab() {
+  const [rows, setRows] = useState([])
+  useEffect(() => { let a = true; getAdminListings().then((d) => a && setRows(d || [])); return () => { a = false } }, [])
   return (
     <>
-      <div className="phead"><div><h2>ประกาศทั้งหมด</h2><p>{allListings.length} รายการที่เผยแพร่อยู่</p></div></div>
+      <div className="phead"><div><h2>ประกาศทั้งหมด</h2><p>{rows.length} รายการในระบบ</p></div></div>
       <div className="pn">
         <table className="tbl">
           <thead><tr><th>ID</th><th>ทรัพย์</th><th>ประเภท</th><th>ผู้ลง</th><th>ค่าเช่า/ด.</th><th>สถานะ</th></tr></thead>
           <tbody>
-            {allListings.map((l) => (
-              <tr key={l.id}>
-                <td><b>{l.id}</b></td><td>{l.title}</td><td>{l.typeLabel}</td>
-                <td>{l.owner.name}</td><td>฿{l.price.toLocaleString()}</td>
-                <td><span className="tg tg-live">เผยแพร่</span></td>
-              </tr>
-            ))}
+            {rows.map((l) => {
+              const st = LST_STATUS[l.status] || LST_STATUS.live
+              return (
+                <tr key={l.id}>
+                  <td><b>{l.id}</b></td><td>{l.title}</td><td>{l.typeLabel}</td>
+                  <td>{l.owner?.name}</td><td>฿{l.price.toLocaleString()}</td>
+                  <td><span className={`tg ${st.cls}`}>{st.label}</span></td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
@@ -264,14 +275,16 @@ function AllListingsTab() {
 }
 
 function ContractsTab() {
+  const [rows, setRows] = useState([])
+  useEffect(() => { let a = true; getAdminContracts().then((d) => a && setRows(d || [])); return () => { a = false } }, [])
   return (
     <>
-      <div className="phead"><div><h2>สัญญาเช่า</h2><p>สัญญาที่ทำผ่านระบบ (ตัวอย่าง)</p></div></div>
+      <div className="phead"><div><h2>สัญญาเช่า</h2><p>{rows.length} ฉบับที่ทำผ่านระบบ</p></div></div>
       <div className="pn">
         <table className="tbl">
           <thead><tr><th>เลขที่</th><th>ทรัพย์</th><th>ผู้เช่า</th><th>เริ่ม</th><th>ระยะ</th><th>ค่าเช่า/ด.</th><th>สถานะ</th></tr></thead>
           <tbody>
-            {memberContracts.map((c) => (
+            {rows.map((c) => (
               <tr key={c.id}>
                 <td><b>{c.id}</b></td><td>{c.property}</td><td>{c.tenant}</td>
                 <td>{c.start}</td><td>{c.months} เดือน</td><td>฿{c.rent.toLocaleString()}</td>

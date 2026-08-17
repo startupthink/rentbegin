@@ -1,9 +1,23 @@
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useSaved } from '../context/SavedContext'
+import { useAuth } from '../context/AuthContext'
 import './Header.css'
 
 export default function Header({ search }) {
   const { count } = useSaved()
+  const { isAuthed, isAdmin, profile, signOut, mode, setMode } = useAuth()
+  const nav = useNavigate()
+
+  async function handleSignOut() {
+    await signOut()
+    nav('/')
+  }
+
+  function switchMode(m) {
+    setMode(m)
+    if (m === 'list') nav('/member')
+    else nav('/')
+  }
 
   return (
     <header className="hdr">
@@ -27,11 +41,38 @@ export default function Header({ search }) {
             ♥
             {count > 0 && <span className="hdr-fav-n">{count}</span>}
           </Link>
-          <Link to="/member" className="lnk">ปล่อยเช่ากับเรา</Link>
-          <Link to="/member" className="acct">
-            <span className="bars">☰</span>
-            <span className="av">?</span>
-          </Link>
+
+          {isAuthed ? (
+            <>
+              {!isAdmin && (
+                <div className="modesw" role="tablist" aria-label="สลับโหมด">
+                  <button
+                    className={`modesw-b ${mode === 'rent' ? 'on' : ''}`}
+                    onClick={() => switchMode('rent')}
+                    title="โหมดหาเช่า"
+                  >🔑 หาเช่า</button>
+                  <button
+                    className={`modesw-b ${mode === 'list' ? 'on' : ''}`}
+                    onClick={() => switchMode('list')}
+                    title="โหมดปล่อยเช่า"
+                  >🏠 ปล่อยเช่า</button>
+                </div>
+              )}
+              {isAdmin && <Link to="/admin" className="lnk">แผงแอดมิน</Link>}
+              <Link to={isAdmin ? '/admin' : '/member'} className="acct" title={profile?.name}>
+                <span className="av">{profile?.initial || 'ผ'}</span>
+              </Link>
+              <button className="lnk" onClick={handleSignOut}>ออกจากระบบ</button>
+            </>
+          ) : (
+            <>
+              <Link to="/login" className="lnk">ปล่อยเช่ากับเรา</Link>
+              <Link to="/login" className="acct">
+                <span className="bars">☰</span>
+                <span className="av">?</span>
+              </Link>
+            </>
+          )}
         </div>
       </div>
     </header>

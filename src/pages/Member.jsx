@@ -2,14 +2,12 @@ import { useEffect, useState } from 'react'
 import Header from '../components/Header'
 import Sidebar from '../components/Sidebar'
 import PropertyCard from '../components/PropertyCard'
-import {
-  GRADIENTS, PROPERTY_TYPES, AMENITIES,
-  memberMessages, memberContracts, memberTransactions,
-  memberReceipts, memberReviewsList,
-} from '../data/mock'
+import { GRADIENTS, PROPERTY_TYPES, AMENITIES } from '../data/mock'
 import {
   getMemberProfile, getMemberStats, getMemberTasks,
   getMemberListings, getMemberViewings, createListing,
+  getMemberMessages, getMemberContracts, getMemberTransactions,
+  getMemberReceipts, getMemberReviews,
 } from '../api/client'
 import './Dashboard.css'
 
@@ -375,10 +373,29 @@ function ViewingsTab({ initial }) {
 
 /* ==================== ข้อความ (แชต) ==================== */
 function MessagesTab() {
-  const [threads, setThreads] = useState(memberMessages)
-  const [activeId, setActiveId] = useState(memberMessages[0].id)
+  const [threads, setThreads] = useState([])
+  const [activeId, setActiveId] = useState(null)
   const [draft, setDraft] = useState('')
+  const [loading, setLoading] = useState(true)
   const active = threads.find((t) => t.id === activeId)
+
+  useEffect(() => {
+    let alive = true
+    getMemberMessages().then((d) => {
+      if (!alive) return
+      setThreads(d || [])
+      setActiveId((d && d[0]?.id) || null)
+    }).finally(() => { if (alive) setLoading(false) })
+    return () => { alive = false }
+  }, [])
+
+  if (loading) return (<><div className="phead"><div><h2>ข้อความ</h2></div></div><div className="spin" /></>)
+  if (threads.length === 0) return (
+    <>
+      <div className="phead"><div><h2>ข้อความ</h2><p>คุยกับผู้สนใจโดยตรง ทุกแชตผูกกับประกาศ</p></div></div>
+      <div className="pn"><div className="done-all">ยังไม่มีข้อความ</div></div>
+    </>
+  )
 
   function send() {
     if (!draft.trim()) return
@@ -429,14 +446,16 @@ function MessagesTab() {
 
 /* ==================== สัญญาเช่า ==================== */
 function ContractsTab() {
+  const [rows, setRows] = useState([])
+  useEffect(() => { let a = true; getMemberContracts().then((d) => a && setRows(d || [])); return () => { a = false } }, [])
   return (
     <>
-      <div className="phead"><div><h2>สัญญาเช่า</h2><p>{memberContracts.length} ฉบับ · สัญญาที่ทำผ่านระบบทั้งหมด</p></div></div>
+      <div className="phead"><div><h2>สัญญาเช่า</h2><p>{rows.length} ฉบับ · สัญญาที่ทำผ่านระบบทั้งหมด</p></div></div>
       <div className="pn">
         <table className="tbl">
           <thead><tr><th>เลขที่</th><th>ทรัพย์</th><th>ผู้เช่า</th><th>เริ่ม</th><th>ระยะ</th><th>ค่าเช่า/ด.</th><th>สถานะ</th><th></th></tr></thead>
           <tbody>
-            {memberContracts.map((c) => (
+            {rows.map((c) => (
               <tr key={c.id}>
                 <td><b>{c.id}</b></td><td>{c.property}</td><td>{c.tenant}</td>
                 <td>{c.start}</td><td>{c.months} เดือน</td><td>฿{c.rent.toLocaleString()}</td>
@@ -453,6 +472,8 @@ function ContractsTab() {
 
 /* ==================== รายรับ / มัดจำ ==================== */
 function RevenueTab({ stats }) {
+  const [txs, setTxs] = useState([])
+  useEffect(() => { let a = true; getMemberTransactions().then((d) => a && setTxs(d || [])); return () => { a = false } }, [])
   return (
     <>
       <div className="phead"><div><h2>รายรับ / มัดจำ</h2><p>สรุปเงินเข้า-ออก และมัดจำที่พักอยู่ในระบบ</p></div></div>
@@ -467,7 +488,7 @@ function RevenueTab({ stats }) {
         <table className="tbl">
           <thead><tr><th>วันที่</th><th>รายการ</th><th style={{ textAlign: 'right' }}>จำนวน</th></tr></thead>
           <tbody>
-            {memberTransactions.map((t) => (
+            {txs.map((t) => (
               <tr key={t.id}>
                 <td>{t.date}</td><td>{t.desc}</td>
                 <td style={{ textAlign: 'right' }}>
@@ -487,11 +508,13 @@ function RevenueTab({ stats }) {
 
 /* ==================== ใบเสร็จ ==================== */
 function ReceiptsTab() {
+  const [rows, setRows] = useState([])
+  useEffect(() => { let a = true; getMemberReceipts().then((d) => a && setRows(d || [])); return () => { a = false } }, [])
   return (
     <>
       <div className="phead"><div><h2>ใบเสร็จ</h2><p>ดาวน์โหลดใบเสร็จค่าเช่าที่ออกผ่านระบบ</p></div></div>
       <div className="pn">
-        {memberReceipts.map((r) => (
+        {rows.map((r) => (
           <div className="lrow" key={r.id}>
             <div className="info"><div className="info-t">{r.desc}</div><div className="info-s">{r.id} · {r.date}</div></div>
             <div className="num"><div className="num-n">฿{r.amount.toLocaleString()}</div></div>
@@ -505,11 +528,14 @@ function ReceiptsTab() {
 
 /* ==================== รีวิว ==================== */
 function ReviewsTab() {
+  const [rows, setRows] = useState([])
+  useEffect(() => { let a = true; getMemberReviews().then((d) => a && setRows(d || [])); return () => { a = false } }, [])
   return (
     <>
-      <div className="phead"><div><h2>รีวิวจากผู้เช่า</h2><p>คะแนนเฉลี่ย 4.8 จาก {memberReviewsList.length + 68} รีวิว</p></div></div>
+      <div className="phead"><div><h2>รีวิวจากผู้เช่า</h2><p>{rows.length} รีวิวจากผู้เช่า</p></div></div>
       <div className="pn">
-        {memberReviewsList.map((r) => (
+        {rows.length === 0 && <div className="done-all">ยังไม่มีรีวิว</div>}
+        {rows.map((r) => (
           <div className="rvw" key={r.id}>
             <div className="dsp-r1">
               <b>{r.name} <span className="stars">{'★'.repeat(r.stars)}{'☆'.repeat(5 - r.stars)}</span></b>

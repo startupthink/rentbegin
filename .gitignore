@@ -1,5 +1,10 @@
 node_modules
 dist
+dist_check
+dist_check2
+dist_env
+dc3
+vite.config.js.timestamp-*.mjs
 .env
 .env.local
 .DS_Store

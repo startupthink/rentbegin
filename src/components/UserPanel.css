@@ -23,6 +23,15 @@
 }
 .up-name{font-size:14.5px;font-weight:800;line-height:1.25}
 .up-role{font-size:12px;color:var(--sub)}
+.up-av.guest{background:linear-gradient(135deg,#c9c6c0,#8f8b84)}
+.up-guest .up-cta{margin-top:4px}
+
+/* ตัวสลับโหมดในการ์ดผู้ใช้ */
+.up-mode{margin-top:10px}
+.up-mode-lbl{display:block;font-size:11px;color:var(--sub);margin-bottom:5px;font-weight:600}
+.up-mode-sw{display:flex;gap:5px;background:var(--soft);border-radius:10px;padding:3px}
+.up-mode-sw button{flex:1;font-size:12px;font-weight:700;color:var(--sub);padding:7px 4px;border-radius:8px;transition:.15s}
+.up-mode-sw button.on{background:#fff;color:var(--brand);box-shadow:var(--shadow)}
 
 .up-roles{display:flex;gap:6px}
 .up-rolechip{

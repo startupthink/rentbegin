@@ -34,6 +34,12 @@
 }
 .lnk{font-size:14.5px;font-weight:600;padding:10px 14px;border-radius:999px}
 .lnk:hover{background:var(--soft)}
+
+/* ตัวสลับโหมด — เห็นตลอดว่าอยู่โหมดไหน */
+.modesw{display:flex;background:var(--soft);border-radius:999px;padding:3px;gap:2px}
+.modesw-b{font-size:13px;font-weight:700;color:var(--sub);padding:7px 12px;border-radius:999px;white-space:nowrap;transition:.15s}
+.modesw-b:hover{color:var(--ink)}
+.modesw-b.on{background:#fff;color:var(--brand);box-shadow:var(--shadow)}
 .acct{
   display:flex;align-items:center;gap:8px;border:1px solid var(--line);
   border-radius:999px;padding:6px 8px 6px 14px;box-shadow:var(--shadow);
