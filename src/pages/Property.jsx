@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import Header from '../components/Header'
-import { AMENITIES } from '../data/mock'
+import { AMENITIES } from '../data/constants'
 import { photoStyle } from '../lib/photo'
 import { getListing, createBooking, calcBooking } from '../api/client'
 import { useSaved } from '../context/SavedContext'

@@ -4,9 +4,8 @@
 //   VITE_SUPABASE_URL       = https://xxxx.supabase.co
 //   VITE_SUPABASE_ANON_KEY  = eyJhbGci...
 //
-// ถ้ายังไม่ได้ตั้งค่า env → supabase = null และระบบจะ fallback
-// ไปใช้ mock data (src/data/mock.js) โดยอัตโนมัติ
-// เมื่อใส่ค่า env แล้ว → ทุกอย่างวิ่งผ่าน Supabase จริง (ไม่ใช่ simulate)
+// ถ้ายังไม่ได้ตั้งค่า env → supabase = null และหน้าเว็บจะแสดงเป็นค่าว่าง
+// (ไม่มีข้อมูลตัวอย่างปลอมแล้ว) เมื่อใส่ค่า env → ทุกอย่างวิ่งผ่าน Supabase จริง
 // ===================================================================
 
 import { createClient } from '@supabase/supabase-js'

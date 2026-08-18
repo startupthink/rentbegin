@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import Header from '../components/Header'
 import UserPanel from '../components/UserPanel'
 import PropertyCard from '../components/PropertyCard'
-import { PROPERTY_TYPES } from '../data/mock'
+import { PROPERTY_TYPES } from '../data/constants'
 import { getListings } from '../api/client'
 import './Home.css'
 

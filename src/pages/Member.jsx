@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import Header from '../components/Header'
 import Sidebar from '../components/Sidebar'
 import PropertyCard from '../components/PropertyCard'
-import { PROPERTY_TYPES, AMENITIES } from '../data/mock'
+import { PROPERTY_TYPES, AMENITIES } from '../data/constants'
 import { photoStyle } from '../lib/photo'
 import {
   getMemberProfile, getMemberStats, getMemberTasks,

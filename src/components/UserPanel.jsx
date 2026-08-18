@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { listings } from '../data/mock'
 import { photoStyle } from '../lib/photo'
 import { useSaved } from '../context/SavedContext'
 import { useAuth } from '../context/AuthContext'
-import { getMemberListings } from '../api/client'
+import { getMemberListings, getListingsByIds } from '../api/client'
 import './UserPanel.css'
 
 // ===================================================================
@@ -19,8 +18,19 @@ export default function UserPanel() {
   const { ids, count } = useSaved()
   const { isAuthed, profile, role, signOut, mode, setMode } = useAuth()
   const [myListings, setMyListings] = useState([])
+  const [savedItems, setSavedItems] = useState([])
 
   const isLister = mode === 'list'
+
+  // ประกาศที่บันทึกไว้ — ดึงของจริงตาม id
+  useEffect(() => {
+    let alive = true
+    if (!ids.length) { setSavedItems([]); return }
+    getListingsByIds(ids.slice(0, 3))
+      .then((d) => { if (alive) setSavedItems(d) })
+      .catch(() => {})
+    return () => { alive = false }
+  }, [ids])
 
   useEffect(() => {
     let alive = true
@@ -31,8 +41,6 @@ export default function UserPanel() {
     }
     return () => { alive = false }
   }, [isAuthed, isLister])
-
-  const savedItems = listings.filter((l) => ids.includes(l.id)).slice(0, 3)
 
   return (
     <aside className="upanel">

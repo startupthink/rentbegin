@@ -1,14 +1,28 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import Header from '../components/Header'
 import PropertyCard from '../components/PropertyCard'
-import { listings } from '../data/mock'
+import { getListingsByIds } from '../api/client'
 import { useSaved } from '../context/SavedContext'
 import './Home.css'
 import './Saved.css'
 
 export default function Saved() {
   const { ids, count, clear } = useSaved()
-  const items = listings.filter((l) => ids.includes(l.id))
+  const [items, setItems] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  // ดึงประกาศจริงตาม id ที่บันทึกไว้
+  useEffect(() => {
+    let alive = true
+    if (!ids.length) { setItems([]); setLoading(false); return }
+    setLoading(true)
+    getListingsByIds(ids)
+      .then((d) => { if (alive) setItems(d) })
+      .catch(() => { if (alive) setItems([]) })
+      .finally(() => { if (alive) setLoading(false) })
+    return () => { alive = false }
+  }, [ids])
 
   return (
     <>
@@ -31,6 +45,8 @@ export default function Saved() {
             <p>เจอที่ถูกใจ กดหัวใจมุมขวาบนของประกาศ<br />แล้วกลับมาดูรวมกันที่นี่ได้เลย</p>
             <Link to="/" className="btn-p">ไปหาที่เช่า →</Link>
           </div>
+        ) : loading ? (
+          <div className="spin" />
         ) : (
           <div className="grid">
             {items.map((it) => (

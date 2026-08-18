@@ -1,4 +1,4 @@
-import { GRADIENTS } from '../data/mock'
+import { GRADIENTS } from '../data/constants'
 
 // ===================================================================
 // ตัวช่วยแสดงรูป — รองรับทั้ง URL จริง (Supabase Storage)

@@ -2,15 +2,26 @@
 // API CLIENT — เชื่อม Supabase จริง (ไม่ใช่ simulate อีกต่อไป)
 //
 // - ถ้าตั้งค่า VITE_SUPABASE_URL/ANON_KEY แล้ว → ดึงข้อมูลจาก Supabase
-// - ถ้ายังไม่ตั้งค่า → fallback ไปใช้ mock (src/data/mock.js) ชั่วคราว
+// - ถ้ายังไม่ตั้งค่า → คืนค่าว่าง (ไม่มีข้อมูลตัวอย่างปลอมอีกแล้ว)
 //
 // component ทุกตัวเรียกผ่านไฟล์นี้ ชื่อฟังก์ชันเดิมไม่เปลี่ยน
 // ===================================================================
 
 import { supabase, HAS_SUPABASE } from '../lib/supabase'
-import * as mock from '../data/mock'
 
 const delay = (ms = 160) => new Promise((r) => setTimeout(r, ms))
+
+// ค่าเริ่มต้นเมื่อยังไม่มีข้อมูล (แทนข้อมูลตัวอย่างเดิม)
+const EMPTY_STATS = {
+  activeListings: 0, pendingReview: 0, viewingsThisWeek: 0, viewingsDelta: 0,
+  totalViews: 0, viewsDeltaPct: 0, closedThisMonth: 0,
+  revenueThisMonth: 0, revenueDeltaPct: 0, revenueChart: [],
+}
+const EMPTY_ADMIN_STATS = {
+  totalMembers: 0, membersDelta: 0, activeListings: 0, listingsDeltaPct: 0,
+  activeContracts: 0, contractsValue: '฿0 / เดือน',
+  feesThisMonth: 0, feesDeltaPct: 0, feesWeek: 0, feesWeekDeltaPct: 0, feesChart: [],
+}
 
 const TYPE_LABELS = {
   condo: 'คอนโด', house: 'บ้านเดี่ยว', townhouse: 'ทาวน์เฮาส์',
@@ -61,19 +72,7 @@ async function myProfile() {
 // LISTINGS
 // ===================================================================
 export async function getListings({ type = 'all', q = '' } = {}) {
-  if (!HAS_SUPABASE) {
-    await delay()
-    let out = mock.listings
-    if (type !== 'all') out = out.filter((l) => l.type === type)
-    if (q.trim()) {
-      const k = q.trim().toLowerCase()
-      out = out.filter((l) =>
-        l.title.toLowerCase().includes(k) ||
-        l.district.toLowerCase().includes(k) ||
-        l.province.toLowerCase().includes(k))
-    }
-    return out
-  }
+  if (!HAS_SUPABASE) { await delay(); return [] }
   let query = supabase.from('listings').select(LISTING_SELECT).eq('status', 'live').order('created_at', { ascending: false })
   if (type !== 'all') query = query.eq('type', type)
   if (q.trim()) query = query.or(`title.ilike.%${q}%,district.ilike.%${q}%,province.ilike.%${q}%`)
@@ -82,13 +81,17 @@ export async function getListings({ type = 'all', q = '' } = {}) {
   return (data || []).map(mapListing)
 }
 
+// ดึงประกาศหลายรายการตาม id — ใช้กับหน้า "ที่บันทึกไว้"
+export async function getListingsByIds(ids = []) {
+  if (!HAS_SUPABASE || !ids.length) return []
+  const { data, error } = await supabase
+    .from('listings').select(LISTING_SELECT).in('id', ids)
+  if (error) throw error
+  return (data || []).map(mapListing)
+}
+
 export async function getListing(id) {
-  if (!HAS_SUPABASE) {
-    await delay(120)
-    const found = mock.listings.find((l) => l.id === id || l.slug === id)
-    if (!found) throw new Error('ไม่พบประกาศนี้')
-    return found
-  }
+  if (!HAS_SUPABASE) throw new Error('ไม่พบประกาศนี้')
   const { data, error } = await supabase.from('listings').select(LISTING_SELECT).or(`id.eq.${id},slug.eq.${id}`).maybeSingle()
   if (error) throw error
   if (!data) throw new Error('ไม่พบประกาศนี้')
@@ -174,16 +177,16 @@ export async function createListing(payload) {
 // MEMBER
 // ===================================================================
 export async function getMemberProfile() {
-  if (!HAS_SUPABASE) { await delay(); return mock.memberProfile }
+  if (!HAS_SUPABASE) { await delay(); return null }
   const p = await myProfile()
-  if (!p) return mock.memberProfile
+  if (!p) return null
   return { id: p.id, name: p.name, initial: p.initial, role: p.role, roleLabel: p.role_label, verified: p.verified, rating: p.rating }
 }
 
 export async function getMemberStats() {
-  if (!HAS_SUPABASE) { await delay(); return mock.memberStats }
+  if (!HAS_SUPABASE) { await delay(); return EMPTY_STATS }
   const p = await myProfile()
-  if (!p) return mock.memberStats
+  if (!p) return EMPTY_STATS
   const [listings, viewings, contracts, txs] = await Promise.all([
     supabase.from('listings').select('status,views').eq('owner_id', p.id),
     supabase.from('viewings').select('id').eq('owner_id', p.id),
@@ -212,7 +215,7 @@ export async function getMemberStats() {
 }
 
 export async function getMemberTasks() {
-  if (!HAS_SUPABASE) { await delay(); return mock.memberTasks }
+  if (!HAS_SUPABASE) { await delay(); return [] }
   const p = await myProfile()
   if (!p) return []
   const [vw, th, ls] = await Promise.all([
@@ -231,7 +234,7 @@ export async function getMemberTasks() {
 }
 
 export async function getMemberListings() {
-  if (!HAS_SUPABASE) { await delay(); return mock.memberListings }
+  if (!HAS_SUPABASE) { await delay(); return [] }
   const p = await myProfile()
   if (!p) return []
   const { data, error } = await supabase.from('listings').select('*').eq('owner_id', p.id).order('created_at', { ascending: false })
@@ -245,7 +248,7 @@ export async function getMemberListings() {
 }
 
 export async function getMemberViewings() {
-  if (!HAS_SUPABASE) { await delay(); return mock.memberViewings }
+  if (!HAS_SUPABASE) { await delay(); return [] }
   const p = await myProfile()
   if (!p) return []
   const { data, error } = await supabase.from('viewings').select('*').eq('owner_id', p.id).order('created_at', { ascending: false })
@@ -254,7 +257,7 @@ export async function getMemberViewings() {
 }
 
 export async function getMemberMessages() {
-  if (!HAS_SUPABASE) { await delay(); return mock.memberMessages }
+  if (!HAS_SUPABASE) { await delay(); return [] }
   const p = await myProfile()
   if (!p) return []
   const { data, error } = await supabase.from('threads').select('*, messages(is_me,text,created_at)').eq('owner_id', p.id).order('created_at', { ascending: false })
@@ -266,7 +269,7 @@ export async function getMemberMessages() {
 }
 
 export async function getMemberContracts() {
-  if (!HAS_SUPABASE) { await delay(); return mock.memberContracts }
+  if (!HAS_SUPABASE) { await delay(); return [] }
   const p = await myProfile()
   if (!p) return []
   const { data, error } = await supabase.from('contracts').select('*').eq('owner_id', p.id)
@@ -275,7 +278,7 @@ export async function getMemberContracts() {
 }
 
 export async function getMemberTransactions() {
-  if (!HAS_SUPABASE) { await delay(); return mock.memberTransactions }
+  if (!HAS_SUPABASE) { await delay(); return [] }
   const p = await myProfile()
   if (!p) return []
   const { data, error } = await supabase.from('transactions').select('*').eq('owner_id', p.id)
@@ -284,7 +287,7 @@ export async function getMemberTransactions() {
 }
 
 export async function getMemberReceipts() {
-  if (!HAS_SUPABASE) { await delay(); return mock.memberReceipts }
+  if (!HAS_SUPABASE) { await delay(); return [] }
   const p = await myProfile()
   if (!p) return []
   const { data, error } = await supabase.from('receipts').select('*').eq('owner_id', p.id)
@@ -293,7 +296,7 @@ export async function getMemberReceipts() {
 }
 
 export async function getMemberReviews() {
-  if (!HAS_SUPABASE) { await delay(); return mock.memberReviewsList }
+  if (!HAS_SUPABASE) { await delay(); return [] }
   const p = await myProfile()
   if (!p) return []
   const { data, error } = await supabase.from('reviews').select('*').eq('owner_id', p.id)
@@ -460,7 +463,7 @@ function buildContractText(b) {
 }
 
 export async function getMyContracts() {
-  if (!HAS_SUPABASE) { await delay(); return mock.memberContracts }
+  if (!HAS_SUPABASE) { await delay(); return [] }
   const prof = await myProfile()
   if (!prof) return []
   const { data, error } = await supabase.from('contracts').select('*')
@@ -500,7 +503,7 @@ export async function signContract(id, fullName, asOwner) {
 // ADMIN
 // ===================================================================
 export async function getAdminStats() {
-  if (!HAS_SUPABASE) { await delay(); return mock.adminStats }
+  if (!HAS_SUPABASE) { await delay(); return EMPTY_ADMIN_STATS }
   const [members, live, contracts, txs] = await Promise.all([
     supabase.from('profiles').select('id', { count: 'exact', head: true }),
     supabase.from('listings').select('id', { count: 'exact', head: true }).eq('status', 'live'),
@@ -526,7 +529,7 @@ export async function getAdminStats() {
 }
 
 export async function getReviewQueue() {
-  if (!HAS_SUPABASE) { await delay(); return mock.adminReviewQueue }
+  if (!HAS_SUPABASE) { await delay(); return [] }
   const { data, error } = await supabase.from('listings').select(LISTING_SELECT).eq('status', 'pending').order('created_at', { ascending: false })
   if (error) throw error
   return (data || []).map((r) => ({
@@ -537,7 +540,7 @@ export async function getReviewQueue() {
 }
 
 export async function getDisputes() {
-  if (!HAS_SUPABASE) { await delay(); return mock.adminDisputes }
+  if (!HAS_SUPABASE) { await delay(); return [] }
   const { data, error } = await supabase.from('disputes').select('*').order('created_at', { ascending: false })
   if (error) throw error
   return (data || []).map((d) => ({ id: d.id, title: d.title, detail: d.detail, status: d.status, statusLabel: d.status_label }))
@@ -558,14 +561,14 @@ export async function rejectListing(id, reason = '') {
 }
 
 export async function getAdminKyc() {
-  if (!HAS_SUPABASE) { await delay(); return mock.adminKycQueue }
+  if (!HAS_SUPABASE) { await delay(); return [] }
   const { data, error } = await supabase.from('kyc_submissions').select('*').eq('status', 'pending').order('created_at', { ascending: false })
   if (error) throw error
   return (data || []).map((k) => ({ id: k.id, name: k.name, role: k.role_label, doc: k.doc, time: k.time_text, photo: k.photo }))
 }
 
 export async function getAdminMembers() {
-  if (!HAS_SUPABASE) { await delay(); return mock.adminMembersList }
+  if (!HAS_SUPABASE) { await delay(); return [] }
   const { data, error } = await supabase.from('profiles').select('*, listings(count)').order('created_at', { ascending: false })
   if (error) throw error
   return (data || []).map((m) => ({
@@ -576,14 +579,14 @@ export async function getAdminMembers() {
 }
 
 export async function getAdminListings() {
-  if (!HAS_SUPABASE) { await delay(); return mock.listings }
+  if (!HAS_SUPABASE) { await delay(); return [] }
   const { data, error } = await supabase.from('listings').select(LISTING_SELECT).order('created_at', { ascending: false })
   if (error) throw error
   return (data || []).map(mapListing)
 }
 
 export async function getAdminContracts() {
-  if (!HAS_SUPABASE) { await delay(); return mock.memberContracts }
+  if (!HAS_SUPABASE) { await delay(); return [] }
   const { data, error } = await supabase.from('contracts').select('*').order('created_at', { ascending: false })
   if (error) throw error
   return (data || []).map((c) => ({ id: c.id, property: c.property, tenant: c.tenant, start: c.start_text, months: c.months, rent: c.rent, status: c.status }))
