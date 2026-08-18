@@ -10,6 +10,7 @@ export const PROPERTY_TYPES = [
   { id: 'condo',     label: 'คอนโด',      icon: '🏙️' },
   { id: 'house',     label: 'บ้านเดี่ยว',  icon: '🏡' },
   { id: 'townhouse', label: 'ทาวน์เฮาส์',  icon: '🏘️' },
+  { id: 'rowhouse',  label: 'ห้องแถว',     icon: '🏚️' },
   { id: 'shophouse', label: 'ตึกแถว',      icon: '🏬' },
   { id: 'office',    label: 'ออฟฟิศ',      icon: '🏢' },
   { id: 'warehouse', label: 'โกดัง',       icon: '📦' },

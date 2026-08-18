@@ -159,7 +159,10 @@ export default function Login() {
           </button>
         </form>
 
-        <p className="auth-foot">การใช้งานถือว่ายอมรับข้อกำหนดและนโยบายความเป็นส่วนตัว</p>
+        <p className="auth-foot">
+          การใช้งานถือว่ายอมรับ <Link to="/terms">ข้อกำหนดการใช้บริการ</Link>
+          {' '}และ <Link to="/privacy">นโยบายความเป็นส่วนตัว</Link>
+        </p>
       </div>
     </div>
   )

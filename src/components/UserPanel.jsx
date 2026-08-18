@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { GRADIENTS, listings } from '../data/mock'
+import { listings } from '../data/mock'
+import { photoStyle } from '../lib/photo'
 import { useSaved } from '../context/SavedContext'
 import { useAuth } from '../context/AuthContext'
 import { getMemberListings } from '../api/client'
@@ -82,7 +83,7 @@ export default function UserPanel() {
           <>
             {savedItems.map((l) => (
               <Link to={`/property/${l.id}`} className="up-mini" key={l.id}>
-                <div className="up-thumb" style={{ background: GRADIENTS[l.photos[0]] }} />
+                <div className="up-thumb" style={photoStyle(l.photos[0])} />
                 <div className="up-mini-t">
                   <div className="t">{l.title}</div>
                   <div className="s">฿{l.price.toLocaleString()}/ด.</div>
@@ -105,7 +106,7 @@ export default function UserPanel() {
             <p className="up-empty">ยังไม่มีประกาศ<br />เริ่มลงประกาศแรกได้เลย</p>
           ) : myListings.slice(0, 3).map((l) => (
             <div className="up-mini" key={l.id}>
-              <div className="up-thumb" style={{ background: GRADIENTS[l.photo] }} />
+              <div className="up-thumb" style={photoStyle(l.photo)} />
               <div className="up-mini-t">
                 <div className="t">{l.title}</div>
                 <div className="s">

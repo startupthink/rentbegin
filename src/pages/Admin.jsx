@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import Header from '../components/Header'
 import Sidebar from '../components/Sidebar'
-import { GRADIENTS } from '../data/mock'
+import { photoStyle } from '../lib/photo'
 import {
   getAdminStats, getReviewQueue, getDisputes,
   approveListing, rejectListing,
@@ -148,7 +148,7 @@ function DashTab({ stats, queue, disputes, busy, handle, goTab }) {
 function ReviewRow({ r, busy, handle }) {
   return (
     <div className="rev">
-      <div className="rev-img" style={{ background: GRADIENTS[r.photo] }} />
+      <div className="rev-img" style={photoStyle(r.photo)} />
       <div className="rev-c">
         <h4>{r.title}</h4>
         <div className="rev-m">{r.meta}</div>
@@ -186,7 +186,7 @@ function KycTab() {
       <div className="pn">
         {items.length === 0 ? <div className="done-all">🎉 ตรวจครบแล้ว</div> : items.map((k) => (
           <div className="rev" key={k.id}>
-            <div className="rev-img" style={{ background: GRADIENTS[k.photo], width: 70, height: 70, borderRadius: '50%' }} />
+            <div className="rev-img" style={{ ...photoStyle(k.photo), width: 70, height: 70, borderRadius: '50%' }} />
             <div className="rev-c">
               <h4>{k.name} <span className="tg tg-new">{k.role}</span></h4>
               <div className="rev-m">เอกสาร: {k.doc} · ส่งเมื่อ {k.time}</div>

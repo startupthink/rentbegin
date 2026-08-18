@@ -14,7 +14,8 @@ const delay = (ms = 160) => new Promise((r) => setTimeout(r, ms))
 
 const TYPE_LABELS = {
   condo: 'คอนโด', house: 'บ้านเดี่ยว', townhouse: 'ทาวน์เฮาส์',
-  shophouse: 'ตึกแถว', office: 'ออฟฟิศ', warehouse: 'โกดัง', land: 'ที่ดิน',
+  rowhouse: 'ห้องแถว', shophouse: 'ตึกแถว', office: 'ออฟฟิศ',
+  warehouse: 'โกดัง', land: 'ที่ดิน',
 }
 
 // ---------- mappers (snake_case DB → camelCase ที่ UI ใช้) ----------
@@ -94,6 +95,47 @@ export async function getListing(id) {
   return mapListing(data)
 }
 
+// ---------- อัปโหลดรูปประกาศ (Supabase Storage) ----------
+// คืนค่าเป็น array ของ public URL — เก็บลงคอลัมน์ photos ได้เลย
+// ถ้ายังไม่ตั้งค่า Supabase จะคืน gradient key เดิมเพื่อให้เดโมทำงานต่อได้
+export async function uploadListingPhotos(files, listingId = 'draft', onProgress) {
+  if (!HAS_SUPABASE) {
+    await delay(400)
+    return ['g1', 'g6', 'g3'].slice(0, Math.max(1, files.length))
+  }
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('ต้องเข้าสู่ระบบก่อนอัปโหลดรูป')
+
+  const urls = []
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i]
+    if (!file.type.startsWith('image/')) continue
+    if (file.size > 5 * 1024 * 1024) throw new Error(`ไฟล์ ${file.name} ใหญ่เกิน 5 MB`)
+
+    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase()
+    const path = `${user.id}/${listingId}/${Date.now()}-${i}.${ext}`
+
+    const { error } = await supabase.storage
+      .from('listing-photos')
+      .upload(path, file, { cacheControl: '31536000', upsert: false })
+    if (error) throw new Error(`อัปโหลดไม่สำเร็จ: ${error.message}`)
+
+    const { data } = supabase.storage.from('listing-photos').getPublicUrl(path)
+    urls.push(data.publicUrl)
+    onProgress?.(i + 1, files.length)
+  }
+  return urls
+}
+
+export async function deleteListingPhoto(url) {
+  if (!HAS_SUPABASE || !url?.startsWith('http')) return
+  const marker = '/listing-photos/'
+  const idx = url.indexOf(marker)
+  if (idx === -1) return
+  const path = url.slice(idx + marker.length)
+  await supabase.storage.from('listing-photos').remove([path])
+}
+
 export async function createListing(payload) {
   if (!HAS_SUPABASE) { await delay(300); return { ok: true, id: 'RB-NEW', ...payload } }
   const prof = await myProfile()
@@ -114,10 +156,12 @@ export async function createListing(payload) {
     bathrooms: Number(payload.bathrooms) || 0,
     size_sqm: Number(payload.sizeSqm) || null,
     available_from: payload.availableFrom || 'ว่างแล้ว',
-    min_lease_months: 12,
+    min_lease_months: Number(payload.minLeaseMonths) || 12,
+    deposit_months: Number(payload.depositMonths) || 2,
+    description: payload.description || '',
     amenities: payload.amenities || [],
-    photos: ['g1', 'g6', 'g3'],
-    photo_count: 3,
+    photos: payload.photos?.length ? payload.photos : ['g1', 'g6', 'g3'],
+    photo_count: payload.photos?.length || 3,
     status: 'pending',
     verified: prof.verified,
   }
@@ -255,6 +299,201 @@ export async function getMemberReviews() {
   const { data, error } = await supabase.from('reviews').select('*').eq('owner_id', p.id)
   if (error) throw error
   return (data || []).map((r) => ({ id: r.id, name: r.reviewer, stars: r.stars, text: r.text, time: r.time_text, property: r.property }))
+}
+
+// ===================================================================
+// BOOKINGS / PAYMENTS  (จอง · มัดจำ · ชำระเงิน)
+// ===================================================================
+
+// คำนวณยอดที่ต้องจ่ายวันเข้าอยู่ (ค่าธรรมเนียม 1% ของค่าเช่าล่วงหน้า)
+export function calcBooking(listing, months = 12) {
+  const rent = listing?.price || 0
+  const depositMonths = listing?.depositMonths ?? 2
+  const advanceMonths = listing?.advanceMonths ?? 1
+  const deposit = rent * depositMonths
+  const advance = rent * advanceMonths
+  const fee = Math.round(advance * 0.01)
+  return { rent, months, depositMonths, advanceMonths, deposit, advance, fee, total: deposit + advance + fee }
+}
+
+// สร้างคำขอจอง — ผู้เช่ากดจากหน้าประกาศ
+export async function createBooking({ listing, moveIn, months, occupants }) {
+  if (!HAS_SUPABASE) { await delay(350); return { ok: true, id: 'BK-DEMO', demo: true } }
+  const prof = await myProfile()
+  if (!prof) throw new Error('ต้องเข้าสู่ระบบก่อนจอง')
+
+  const c = calcBooking(listing, months)
+  const { data, error } = await supabase.from('bookings').insert({
+    listing_id: listing.id,
+    renter_id: prof.id,
+    owner_id: listing.owner?.id || null,
+    move_in_text: moveIn,
+    months: Number(months) || 12,
+    occupants: Number(occupants) || 1,
+    rent: c.rent, deposit: c.deposit, advance: c.advance, fee: c.fee, total: c.total,
+    status: 'pending',
+  }).select().maybeSingle()
+  if (error) throw error
+  return { ok: true, id: data.id, ...c }
+}
+
+export async function getMyBookings() {
+  if (!HAS_SUPABASE) { await delay(); return [] }
+  const prof = await myProfile()
+  if (!prof) return []
+  const { data, error } = await supabase
+    .from('bookings')
+    .select('*, listings(title, photos, district), payments(status, qr_url, amount)')
+    .or(`renter_id.eq.${prof.id},owner_id.eq.${prof.id}`)
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return (data || []).map((b) => ({
+    id: b.id,
+    listingId: b.listing_id,
+    title: b.listings?.title || b.listing_id,
+    photo: (b.listings?.photos || [])[0] || 'g1',
+    district: b.listings?.district,
+    moveIn: b.move_in_text,
+    months: b.months,
+    rent: b.rent, deposit: b.deposit, advance: b.advance, fee: b.fee, total: b.total,
+    status: b.status,
+    isOwner: b.owner_id === prof.id,
+    payment: b.payments?.[0] || null,
+    createdAt: b.created_at,
+  }))
+}
+
+// เจ้าของกดรับ/ปฏิเสธคำขอจอง
+export async function respondBooking(id, accept = true) {
+  if (!HAS_SUPABASE) { await delay(250); return { ok: true } }
+  const { error } = await supabase.from('bookings')
+    .update({ status: accept ? 'accepted' : 'rejected', updated_at: new Date().toISOString() })
+    .eq('id', id)
+  if (error) throw error
+  return { ok: true }
+}
+
+// เริ่มชำระเงิน — เรียก edge function omise-charge
+export async function payBooking(bookingId, method = 'promptpay', token = null) {
+  if (!HAS_SUPABASE) {
+    await delay(500)
+    return { ok: true, demo: true, status: 'pending', qrUrl: null,
+      message: 'โหมดสาธิต — ยังไม่ได้เชื่อม Omise' }
+  }
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) throw new Error('ต้องเข้าสู่ระบบก่อน')
+
+  const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/omise-charge`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ bookingId, method, token, returnUri: `${window.location.origin}/member` }),
+  })
+  const out = await res.json()
+  if (!res.ok) throw new Error(out.error || 'ชำระเงินไม่สำเร็จ')
+  return out
+}
+
+// เช็กสถานะการชำระ (ใช้ polling ตอนรอสแกน PromptPay)
+export async function getPaymentStatus(bookingId) {
+  if (!HAS_SUPABASE) return null
+  const { data } = await supabase
+    .from('payments').select('status, qr_url, amount, paid_at')
+    .eq('booking_id', bookingId).order('created_at', { ascending: false }).limit(1).maybeSingle()
+  return data
+}
+
+// ===================================================================
+// CONTRACTS — สัญญาเช่าดิจิทัล + e-signature
+// ===================================================================
+
+export async function createContractFromBooking(bookingId) {
+  if (!HAS_SUPABASE) { await delay(300); return { ok: true, id: 'C-DEMO' } }
+  const { data: b } = await supabase
+    .from('bookings').select('*, listings(title, district, province, type_label)')
+    .eq('id', bookingId).maybeSingle()
+  if (!b) throw new Error('ไม่พบรายการจอง')
+
+  const id = 'C-' + Date.now().toString().slice(-6)
+  const body = buildContractText(b)
+  const { error } = await supabase.from('contracts').insert({
+    id,
+    booking_id: b.id,
+    listing_id: b.listing_id,
+    owner_id: b.owner_id,
+    renter_id: b.renter_id,
+    property: b.listings?.title || b.listing_id,
+    tenant: '',
+    start_text: b.move_in_text,
+    months: b.months,
+    rent: b.rent,
+    status: 'awaiting_signatures',
+    body,
+    terms: {
+      deposit: b.deposit, advance: b.advance, fee: b.fee, total: b.total,
+      district: b.listings?.district, province: b.listings?.province,
+    },
+  })
+  if (error) throw error
+  return { ok: true, id }
+}
+
+function buildContractText(b) {
+  const t = b.listings || {}
+  return `สัญญาเช่า${t.type_label || 'อสังหาริมทรัพย์'}
+
+ทรัพย์ที่เช่า: ${t.title || b.listing_id}
+ที่ตั้ง: ${t.district || '-'} ${t.province || ''}
+
+1. ระยะเวลาเช่า ${b.months} เดือน เริ่ม ${b.move_in_text || '-'}
+2. ค่าเช่าเดือนละ ${Number(b.rent).toLocaleString()} บาท ชำระทุกวันที่ 1 ของเดือน
+3. เงินประกัน (มัดจำ) ${Number(b.deposit).toLocaleString()} บาท คืนเมื่อสิ้นสุดสัญญาและไม่มีความเสียหาย
+4. ค่าเช่าล่วงหน้า ${Number(b.advance).toLocaleString()} บาท
+5. ค่าน้ำ ค่าไฟ ผู้เช่าเป็นผู้ชำระตามมิเตอร์จริง
+6. ผู้เช่าต้องดูแลรักษาทรัพย์ที่เช่า ห้ามดัดแปลงโครงสร้างโดยไม่ได้รับอนุญาต
+7. ห้ามให้เช่าช่วงโดยไม่ได้รับความยินยอมเป็นลายลักษณ์อักษร
+8. การบอกเลิกสัญญาก่อนกำหนดต้องแจ้งล่วงหน้าไม่น้อยกว่า 30 วัน
+9. หากผิดนัดชำระเกิน 7 วัน ผู้ให้เช่ามีสิทธิ์บอกเลิกสัญญา
+10. คู่สัญญาได้อ่านและเข้าใจข้อความข้างต้นโดยตลอดแล้ว จึงลงลายมือชื่อดิจิทัลไว้เป็นสำคัญ`
+}
+
+export async function getMyContracts() {
+  if (!HAS_SUPABASE) { await delay(); return mock.memberContracts }
+  const prof = await myProfile()
+  if (!prof) return []
+  const { data, error } = await supabase.from('contracts').select('*')
+    .or(`owner_id.eq.${prof.id},renter_id.eq.${prof.id}`)
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return (data || []).map((c) => ({
+    id: c.id, property: c.property, tenant: c.tenant, start: c.start_text,
+    months: c.months, rent: c.rent, status: c.status, body: c.body, terms: c.terms,
+    isOwner: c.owner_id === prof.id,
+    ownerSigned: Boolean(c.owner_signed_at),
+    renterSigned: Boolean(c.renter_signed_at),
+    ownerSignName: c.owner_sign_name, renterSignName: c.renter_sign_name,
+  }))
+}
+
+// ลงนามดิจิทัล — พิมพ์ชื่อเต็มเพื่อยืนยัน (เก็บเวลาและฝ่ายที่ลง)
+export async function signContract(id, fullName, asOwner) {
+  if (!HAS_SUPABASE) { await delay(300); return { ok: true } }
+  const now = new Date().toISOString()
+  const patch = asOwner
+    ? { owner_signed_at: now, owner_sign_name: fullName }
+    : { renter_signed_at: now, renter_sign_name: fullName, tenant: fullName }
+  const { error } = await supabase.from('contracts').update(patch).eq('id', id)
+  if (error) throw error
+
+  // ถ้าลงนามครบสองฝ่าย → สัญญามีผล
+  const { data: c } = await supabase.from('contracts')
+    .select('owner_signed_at, renter_signed_at').eq('id', id).maybeSingle()
+  if (c?.owner_signed_at && c?.renter_signed_at) {
+    await supabase.from('contracts').update({ status: 'active' }).eq('id', id)
+  }
+  return { ok: true }
 }
 
 // ===================================================================

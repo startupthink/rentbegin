@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { GRADIENTS } from '../data/mock'
+import { photoStyle } from '../lib/photo'
 import { useSaved } from '../context/SavedContext'
 import './PropertyCard.css'
 
@@ -32,7 +32,7 @@ export default function PropertyCard({ item, preview = false }) {
   return (
     <div className={`card ${preview ? 'is-preview' : ''}`} onClick={open}>
       <div className="ph">
-        <div className="bg" style={{ background: GRADIENTS[photos[slide]] || GRADIENTS.g1 }} />
+        <div className="bg" style={photoStyle(photos[slide])} />
 
         {item.verified && <span className="pill verified">✓ ยืนยันแล้ว</span>}
         {item.hot && !item.verified && <span className="pill hot">🔥 คนดูเยอะ</span>}

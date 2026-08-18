@@ -2,20 +2,25 @@ import { useEffect, useState } from 'react'
 import Header from '../components/Header'
 import Sidebar from '../components/Sidebar'
 import PropertyCard from '../components/PropertyCard'
-import { GRADIENTS, PROPERTY_TYPES, AMENITIES } from '../data/mock'
+import { PROPERTY_TYPES, AMENITIES } from '../data/mock'
+import { photoStyle } from '../lib/photo'
 import {
   getMemberProfile, getMemberStats, getMemberTasks,
   getMemberListings, getMemberViewings, createListing,
   getMemberMessages, getMemberContracts, getMemberTransactions,
   getMemberReceipts, getMemberReviews,
+  uploadListingPhotos, deleteListingPhoto,
+  getMyBookings, respondBooking, payBooking,
+  createContractFromBooking, getMyContracts, signContract,
 } from '../api/client'
 import './Dashboard.css'
 
 // ตัวเลขบนเมนู = จำนวนจริงของบัญชีนี้
-const buildNav = ({ listings = 0, viewings = 0, rating } = {}) => [
+const buildNav = ({ listings = 0, viewings = 0, bookings = 0, rating } = {}) => [
   { id: 'overview',  icon: '🏠', label: 'ภาพรวม' },
   { id: 'listings',  icon: '📋', label: 'ประกาศของฉัน', count: listings || undefined },
   { id: 'viewings',  icon: '📅', label: 'นัดชม', count: viewings || undefined },
+  { id: 'bookings',  icon: '🔒', label: 'การจอง / มัดจำ', count: bookings || undefined },
   { id: 'messages',  icon: '💬', label: 'ข้อความ' },
   { id: 'contracts', icon: '📝', label: 'สัญญาเช่า' },
   { group: 'เงิน' },
@@ -41,16 +46,19 @@ export default function Member() {
   const [viewings, setViewings] = useState([])
   const [loading, setLoading] = useState(true)
   const [doneTasks, setDoneTasks] = useState([])
+  const [bookingCount, setBookingCount] = useState(0)
 
   useEffect(() => {
     let alive = true
     Promise.all([
       getMemberProfile(), getMemberStats(), getMemberTasks(),
-      getMemberListings(), getMemberViewings(),
+      getMemberListings(), getMemberViewings(), getMyBookings(),
     ])
-      .then(([p, s, t, l, v]) => {
+      .then(([p, s, t, l, v, b]) => {
         if (!alive) return
         setProfile(p); setStats(s); setTasks(t); setListings(l); setViewings(v)
+        // นับเฉพาะรายการที่ต้องดำเนินการ (รอตอบรับ / รอชำระ)
+        setBookingCount((b || []).filter((x) => ['pending', 'accepted'].includes(x.status)).length)
       })
       .finally(() => { if (alive) setLoading(false) })
     return () => { alive = false }
@@ -67,7 +75,10 @@ export default function Member() {
         <Sidebar
           variant="member"
           profile={profile}
-          items={buildNav({ listings: listings.length, viewings: viewings.length, rating: profile.rating })}
+          items={buildNav({
+            listings: listings.length, viewings: viewings.length,
+            bookings: bookingCount, rating: profile.rating,
+          })}
           active={tab}
           onSelect={setTab}
         />
@@ -81,6 +92,7 @@ export default function Member() {
           )}
           {tab === 'listings' && <ListingsTab listings={listings} profile={profile} />}
           {tab === 'viewings' && <ViewingsTab initial={viewings} />}
+          {tab === 'bookings' && <BookingsTab />}
           {tab === 'messages' && <MessagesTab />}
           {tab === 'contracts' && <ContractsTab />}
           {tab === 'revenue' && <RevenueTab stats={stats} />}
@@ -124,7 +136,7 @@ function OverviewTab({ profile, stats, tasks, listings, viewings, doneTasks, set
               <div className="done-all">🎉 เคลียร์หมดแล้ว ไม่มีอะไรค้าง</div>
             ) : visibleTasks.map((t) => (
               <div className="lrow" key={t.id}>
-                <div className="th" style={{ background: GRADIENTS[t.photo] }} />
+                <div className="th" style={photoStyle(t.photo)} />
                 <div className="info">
                   <div className="info-t">{t.title}</div>
                   <div className="info-s">{t.sub}</div>
@@ -145,7 +157,7 @@ function OverviewTab({ profile, stats, tasks, listings, viewings, doneTasks, set
             <div className="pn-h"><h3>ประกาศของฉัน</h3><button className="btn-o btn-s" onClick={() => goTab('listings')}>ดูทั้งหมด</button></div>
             {listings.slice(0, 3).map((l) => (
               <div className="lrow" key={l.id}>
-                <div className="th" style={{ background: GRADIENTS[l.photo] }} />
+                <div className="th" style={photoStyle(l.photo)} />
                 <div className="info"><div className="info-t">{l.title}</div><div className="info-s">{l.sub}</div></div>
                 <div className="num"><div className="num-n">฿{l.price.toLocaleString()}</div><div className="num-l">{l.views ? `${l.views.toLocaleString()} วิว` : '—'}</div></div>
                 <div className="act"><span className={`tg ${STATUS[l.status].cls}`}>{STATUS[l.status].label}</span></div>
@@ -195,7 +207,11 @@ function ListingsTab({ listings, profile }) {
     postAs: 'agent', type: 'condo', title: '', district: '',
     availableFrom: '', bedrooms: 1, bathrooms: 1, sizeSqm: 30,
     price: 15000, amenities: ['aircon', 'furnished', 'bts', 'washer'],
+    depositMonths: 2, minLeaseMonths: 12, description: '',
   })
+  const [photos, setPhotos] = useState([])
+  const [uploading, setUploading] = useState(false)
+  const [upErr, setUpErr] = useState('')
 
   function toggleAmenity(id) {
     setForm((f) => ({
@@ -204,12 +220,36 @@ function ListingsTab({ listings, profile }) {
     }))
   }
 
+  // ---------- อัปโหลดรูปจริง ----------
+  async function handleFiles(fileList) {
+    const files = Array.from(fileList || [])
+    if (!files.length) return
+    if (photos.length + files.length > 10) {
+      setUpErr('อัปโหลดได้สูงสุด 10 รูป')
+      return
+    }
+    setUpErr(''); setUploading(true)
+    try {
+      const urls = await uploadListingPhotos(files)
+      setPhotos((p) => [...p, ...urls])
+    } catch (e) {
+      setUpErr(e.message)
+    } finally { setUploading(false) }
+  }
+
+  function removePhoto(url) {
+    setPhotos((p) => p.filter((x) => x !== url))
+    deleteListingPhoto(url).catch(() => {})
+  }
+
   async function submitListing() {
     setSaving(true); setSavedMsg('')
     try {
-      await createListing(form)
+      await createListing({ ...form, photos })
       setSavedMsg('✓ ส่งประกาศเพื่อตรวจสอบแล้ว — แอดมินจะตรวจภายใน 24 ชม.')
-      setStep(1)
+      setStep(1); setPhotos([])
+    } catch (e) {
+      setSavedMsg('✕ ' + e.message)
     } finally { setSaving(false) }
   }
 
@@ -222,7 +262,8 @@ function ListingsTab({ listings, profile }) {
     price: Number(form.price) || 0,
     bedrooms: Number(form.bedrooms), bathrooms: Number(form.bathrooms),
     sizeSqm: Number(form.sizeSqm), type: form.type,
-    rating: 0, verified: profile.verified, hot: false, photos: ['g1', 'g6', 'g3'],
+    rating: 0, verified: profile.verified, hot: false,
+    photos: photos.length ? photos : ['g1', 'g6', 'g3'],
   }
 
   return (
@@ -234,7 +275,7 @@ function ListingsTab({ listings, profile }) {
       <div className="pn" style={{ marginBottom: 28 }}>
         {listings.map((l) => (
           <div className="lrow" key={l.id}>
-            <div className="th" style={{ background: GRADIENTS[l.photo] }} />
+            <div className="th" style={photoStyle(l.photo)} />
             <div className="info"><div className="info-t">{l.title}</div><div className="info-s">{l.sub}</div></div>
             <div className="num"><div className="num-n">฿{l.price.toLocaleString()}</div><div className="num-l">{l.views ? `${l.views.toLocaleString()} วิว` : '—'}</div></div>
             <div className="act">
@@ -305,12 +346,39 @@ function ListingsTab({ listings, profile }) {
 
           {step === 2 && (
             <>
-              <div className="fr"><label>รูปภาพ</label>
-                <div className="drop">📷 ลากรูปมาวาง หรือ <b>เลือกไฟล์</b><br /><span className="drop-sub">รูปแรกจะเป็นรูปปก · แนะนำอย่างน้อย 5 รูป</span></div>
+              <div className="fr">
+                <label>รูปภาพ ({photos.length}/10)</label>
+                <label className={`drop ${uploading ? 'busy' : ''}`}>
+                  <input
+                    type="file" accept="image/*" multiple hidden
+                    disabled={uploading}
+                    onChange={(e) => { handleFiles(e.target.files); e.target.value = '' }}
+                  />
+                  {uploading ? (
+                    <>⏳ กำลังอัปโหลด...</>
+                  ) : (
+                    <>📷 กดเพื่อ <b>เลือกไฟล์รูป</b><br />
+                      <span className="drop-sub">รูปแรกจะเป็นรูปปก · แนะนำอย่างน้อย 5 รูป · ไม่เกิน 5 MB ต่อรูป</span></>
+                  )}
+                </label>
               </div>
-              <div className="fr"><label>วิดีโอ (ไม่บังคับ)</label>
-                <div className="drop">🎥 อัปโหลดวิดีโอพาชม 1 คลิป<br /><span className="drop-sub">ประกาศที่มีวิดีโอมีคนดูมากกว่า 2 เท่า</span></div>
-              </div>
+
+              {upErr && <div className="flash err">{upErr}</div>}
+
+              {photos.length > 0 && (
+                <div className="fr">
+                  <label>รูปที่อัปโหลดแล้ว</label>
+                  <div className="photogrid">
+                    {photos.map((url, i) => (
+                      <div className="photoitem" key={url} style={photoStyle(url)}>
+                        {i === 0 && <span className="photocover">ปก</span>}
+                        <button className="photodel" onClick={() => removePhoto(url)} title="ลบรูปนี้">✕</button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="btn-pair">
                 <button className="btn-o full" onClick={() => setStep(1)}>← ย้อนกลับ</button>
                 <button className="btn-p full big-btn" onClick={() => setStep(3)}>ถัดไป →</button>
@@ -324,12 +392,20 @@ function ListingsTab({ listings, profile }) {
                 <div className="fr"><label htmlFor="fprice">ค่าเช่า / เดือน (฿)</label>
                   <input id="fprice" type="number" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} /></div>
                 <div className="fr"><label htmlFor="fdep">มัดจำ (เดือน)</label>
-                  <select id="fdep" defaultValue="2"><option value="1">1 เดือน</option><option value="2">2 เดือน</option><option value="3">3 เดือน</option></select></div>
+                  <select id="fdep" value={form.depositMonths}
+                    onChange={(e) => setForm({ ...form, depositMonths: e.target.value })}>
+                    <option value="1">1 เดือน</option><option value="2">2 เดือน</option><option value="3">3 เดือน</option>
+                  </select></div>
               </div>
               <div className="fr"><label htmlFor="flease">สัญญาขั้นต่ำ</label>
-                <select id="flease" defaultValue="12"><option value="6">6 เดือน</option><option value="12">12 เดือน</option><option value="24">24 เดือน</option></select></div>
+                <select id="flease" value={form.minLeaseMonths}
+                  onChange={(e) => setForm({ ...form, minLeaseMonths: e.target.value })}>
+                  <option value="6">6 เดือน</option><option value="12">12 เดือน</option><option value="24">24 เดือน</option>
+                </select></div>
               <div className="fr"><label htmlFor="fdesc">รายละเอียด</label>
-                <textarea id="fdesc" rows="4" placeholder="บอกจุดเด่นของทรัพย์ ทำเล การเดินทาง สิ่งอำนวยความสะดวก..." /></div>
+                <textarea id="fdesc" rows="4" value={form.description}
+                  onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  placeholder="บอกจุดเด่นของทรัพย์ ทำเล การเดินทาง สิ่งอำนวยความสะดวก..." /></div>
               <div className="btn-pair">
                 <button className="btn-o full" onClick={() => setStep(2)}>← ย้อนกลับ</button>
                 <button className="btn-p full big-btn" onClick={submitListing} disabled={saving}>
@@ -381,6 +457,124 @@ function ViewingsTab({ initial }) {
   )
 }
 
+/* ==================== การจอง / มัดจำ ==================== */
+const BK_STATUS = {
+  pending:   { cls: 'tg-wait',   label: 'รอเจ้าของตอบรับ' },
+  accepted:  { cls: 'tg-new',    label: 'รอชำระมัดจำ' },
+  paid:      { cls: 'tg-live',   label: 'ชำระแล้ว · พักเงิน' },
+  active:    { cls: 'tg-live',   label: 'เข้าอยู่แล้ว' },
+  completed: { cls: 'tg-off',    label: 'จบสัญญา' },
+  cancelled: { cls: 'tg-off',    label: 'ยกเลิก' },
+  rejected:  { cls: 'tg-danger', label: 'ถูกปฏิเสธ' },
+}
+
+function BookingsTab() {
+  const [rows, setRows] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState(null)
+  const [flash, setFlash] = useState('')
+  const [qr, setQr] = useState(null)
+
+  const load = () => getMyBookings().then(setRows).finally(() => setLoading(false))
+  useEffect(() => { load() }, [])
+
+  async function respond(id, accept) {
+    setBusy(id)
+    try {
+      await respondBooking(id, accept)
+      setFlash(accept ? '✓ ตอบรับคำขอจองแล้ว — รอผู้เช่าชำระมัดจำ' : '✕ ปฏิเสธคำขอจองแล้ว')
+      await load()
+      setTimeout(() => setFlash(''), 3500)
+    } catch (e) { setFlash('✕ ' + e.message) } finally { setBusy(null) }
+  }
+
+  async function pay(id) {
+    setBusy(id); setQr(null)
+    try {
+      const out = await payBooking(id, 'promptpay')
+      if (out.qrUrl) setQr({ url: out.qrUrl, amount: out.amount, id })
+      else setFlash(out.message || '✓ เริ่มรายการชำระเงินแล้ว')
+      await load()
+    } catch (e) { setFlash('✕ ' + e.message) } finally { setBusy(null) }
+  }
+
+  async function makeContract(id) {
+    setBusy(id)
+    try {
+      await createContractFromBooking(id)
+      setFlash('✓ สร้างสัญญาเช่าแล้ว — ไปลงนามที่แท็บ "สัญญาเช่า"')
+      setTimeout(() => setFlash(''), 4000)
+    } catch (e) { setFlash('✕ ' + e.message) } finally { setBusy(null) }
+  }
+
+  if (loading) return (<><div className="phead"><div><h2>การจอง / มัดจำ</h2></div></div><div className="spin" /></>)
+
+  return (
+    <>
+      <div className="phead">
+        <div><h2>การจอง / มัดจำ</h2><p>{rows.length} รายการ · เงินมัดจำพักในระบบจนกว่าจะเข้าอยู่</p></div>
+      </div>
+      {flash && <div className={`flash ${flash.startsWith('✕') ? 'err' : ''}`}>{flash}</div>}
+
+      {qr && (
+        <div className="pn pn-pad qrbox">
+          <h3 className="pn-title">สแกนจ่ายด้วย PromptPay</h3>
+          <img src={qr.url} alt="PromptPay QR" className="qrimg" />
+          <div className="big">฿{Number(qr.amount).toLocaleString()}</div>
+          <p className="qr-note">เปิดแอปธนาคาร → สแกน QR → ระบบจะอัปเดตอัตโนมัติเมื่อจ่ายสำเร็จ</p>
+          <button className="btn-o btn-s" onClick={() => { setQr(null); load() }}>ปิด / รีเฟรชสถานะ</button>
+        </div>
+      )}
+
+      <div className="pn">
+        {rows.length === 0 ? (
+          <div className="done-all">ยังไม่มีรายการจอง</div>
+        ) : rows.map((b) => {
+          const st = BK_STATUS[b.status] || BK_STATUS.pending
+          return (
+            <div className="lrow" key={b.id}>
+              <div className="th" style={photoStyle(b.photo)} />
+              <div className="info">
+                <div className="info-t">{b.title}</div>
+                <div className="info-s">
+                  #{b.id} · เข้าอยู่ {b.moveIn || '-'} · {b.months} เดือน
+                  {b.isOwner ? ' · คุณเป็นผู้ให้เช่า' : ' · คุณเป็นผู้เช่า'}
+                </div>
+              </div>
+              <div className="num">
+                <div className="num-n">฿{Number(b.total).toLocaleString()}</div>
+                <div className="num-l">มัดจำ+ล่วงหน้า</div>
+              </div>
+              <div className="act">
+                <span className={`tg ${st.cls}`}>{st.label}</span>
+
+                {b.isOwner && b.status === 'pending' && (
+                  <>
+                    <button className="btn-ok" disabled={busy === b.id} onClick={() => respond(b.id, true)}>ตอบรับ</button>
+                    <button className="btn-no" disabled={busy === b.id} onClick={() => respond(b.id, false)}>ปฏิเสธ</button>
+                  </>
+                )}
+
+                {!b.isOwner && b.status === 'accepted' && (
+                  <button className="btn-p btn-s" disabled={busy === b.id} onClick={() => pay(b.id)}>
+                    {busy === b.id ? 'กำลังสร้าง QR...' : '💳 ชำระมัดจำ'}
+                  </button>
+                )}
+
+                {b.status === 'paid' && b.isOwner && (
+                  <button className="btn-o btn-s" disabled={busy === b.id} onClick={() => makeContract(b.id)}>
+                    📝 สร้างสัญญา
+                  </button>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </>
+  )
+}
+
 /* ==================== ข้อความ (แชต) ==================== */
 function MessagesTab() {
   const [threads, setThreads] = useState([])
@@ -423,7 +617,7 @@ function MessagesTab() {
           {threads.map((t) => (
             <div key={t.id} className={`thread ${t.id === activeId ? 'on' : ''}`}
               onClick={() => { setActiveId(t.id); setThreads((s) => s.map((x) => x.id === t.id ? { ...x, unread: 0 } : x)) }}>
-              <div className="th" style={{ background: GRADIENTS[t.photo] }} />
+              <div className="th" style={photoStyle(t.photo)} />
               <div style={{ minWidth: 0, flex: 1 }}>
                 <div className="t">{t.from}</div>
                 <div className="s">{t.property} · {t.time}</div>
@@ -455,26 +649,102 @@ function MessagesTab() {
 }
 
 /* ==================== สัญญาเช่า ==================== */
+const C_STATUS = {
+  draft:               { cls: 'tg-off',  label: 'ร่าง' },
+  awaiting_signatures: { cls: 'tg-wait', label: 'รอลงนาม' },
+  active:              { cls: 'tg-live', label: 'มีผลบังคับใช้' },
+  ending:              { cls: 'tg-wait', label: 'ใกล้ครบกำหนด' },
+  ended:               { cls: 'tg-off',  label: 'สิ้นสุด' },
+  cancelled:           { cls: 'tg-off',  label: 'ยกเลิก' },
+}
+
 function ContractsTab() {
   const [rows, setRows] = useState([])
-  useEffect(() => { let a = true; getMemberContracts().then((d) => a && setRows(d || [])); return () => { a = false } }, [])
+  const [open, setOpen] = useState(null)     // สัญญาที่กางอ่านอยู่
+  const [signName, setSignName] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [flash, setFlash] = useState('')
+
+  const load = () => getMyContracts().then((d) => setRows(d || []))
+  useEffect(() => { load() }, [])
+
+  async function doSign(c) {
+    if (signName.trim().length < 3) { setFlash('✕ กรุณาพิมพ์ชื่อ-นามสกุลเต็มเพื่อลงนาม'); return }
+    setBusy(true)
+    try {
+      await signContract(c.id, signName.trim(), c.isOwner)
+      setFlash('✓ ลงนามเรียบร้อย')
+      setSignName(''); setOpen(null)
+      await load()
+      setTimeout(() => setFlash(''), 3500)
+    } catch (e) { setFlash('✕ ' + e.message) } finally { setBusy(false) }
+  }
+
   return (
     <>
-      <div className="phead"><div><h2>สัญญาเช่า</h2><p>{rows.length} ฉบับ · สัญญาที่ทำผ่านระบบทั้งหมด</p></div></div>
+      <div className="phead"><div><h2>สัญญาเช่า</h2><p>{rows.length} ฉบับ · ลงนามดิจิทัลได้ในระบบ</p></div></div>
+      {flash && <div className={`flash ${flash.startsWith('✕') ? 'err' : ''}`}>{flash}</div>}
+
       <div className="pn">
-        <table className="tbl">
-          <thead><tr><th>เลขที่</th><th>ทรัพย์</th><th>ผู้เช่า</th><th>เริ่ม</th><th>ระยะ</th><th>ค่าเช่า/ด.</th><th>สถานะ</th><th></th></tr></thead>
-          <tbody>
-            {rows.map((c) => (
-              <tr key={c.id}>
-                <td><b>{c.id}</b></td><td>{c.property}</td><td>{c.tenant}</td>
-                <td>{c.start}</td><td>{c.months} เดือน</td><td>฿{c.rent.toLocaleString()}</td>
-                <td><span className={`tg ${c.status === 'active' ? 'tg-live' : 'tg-wait'}`}>{c.status === 'active' ? 'ใช้งานอยู่' : 'ใกล้ครบกำหนด'}</span></td>
-                <td><button className="btn-o btn-s">ดูสัญญา</button></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        {rows.length === 0 ? <div className="done-all">ยังไม่มีสัญญา</div> : rows.map((c) => {
+          const st = C_STATUS[c.status] || C_STATUS.draft
+          const mySigned = c.isOwner ? c.ownerSigned : c.renterSigned
+          return (
+            <div key={c.id}>
+              <div className="lrow">
+                <div className="info">
+                  <div className="info-t">{c.property}</div>
+                  <div className="info-s">
+                    #{c.id} · เริ่ม {c.start} · {c.months} เดือน · ฿{Number(c.rent).toLocaleString()}/ด.
+                  </div>
+                  <div className="signrow">
+                    <span className={c.ownerSigned ? 'ok' : ''}>
+                      {c.ownerSigned ? '✓' : '○'} ผู้ให้เช่า{c.ownerSignName ? ` (${c.ownerSignName})` : ''}
+                    </span>
+                    <span className={c.renterSigned ? 'ok' : ''}>
+                      {c.renterSigned ? '✓' : '○'} ผู้เช่า{c.renterSignName ? ` (${c.renterSignName})` : ''}
+                    </span>
+                  </div>
+                </div>
+                <div className="act">
+                  <span className={`tg ${st.cls}`}>{st.label}</span>
+                  <button className="btn-o btn-s" onClick={() => setOpen(open === c.id ? null : c.id)}>
+                    {open === c.id ? 'ปิด' : 'ดูสัญญา'}
+                  </button>
+                </div>
+              </div>
+
+              {open === c.id && (
+                <div className="contractbox">
+                  <pre className="contracttext">{c.body || 'ไม่มีเนื้อหาสัญญา'}</pre>
+                  {!mySigned && c.status === 'awaiting_signatures' ? (
+                    <div className="signbox">
+                      <label>ลงนามดิจิทัล — พิมพ์ชื่อ-นามสกุลเต็มของคุณ</label>
+                      <div className="signinput">
+                        <input
+                          value={signName}
+                          onChange={(e) => setSignName(e.target.value)}
+                          placeholder="เช่น สมชาย ใจดี"
+                        />
+                        <button className="btn-p" disabled={busy} onClick={() => doSign(c)}>
+                          {busy ? 'กำลังลงนาม...' : '✍️ ลงนาม'}
+                        </button>
+                      </div>
+                      <p className="signnote">
+                        การพิมพ์ชื่อและกดลงนาม ถือเป็นการแสดงเจตนาผูกพันตามสัญญาฉบับนี้
+                        ระบบจะบันทึกชื่อและเวลาที่ลงนามไว้เป็นหลักฐาน
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="signnote">
+                      {mySigned ? '✓ คุณลงนามในสัญญาฉบับนี้แล้ว' : 'สัญญานี้ไม่อยู่ในขั้นตอนลงนาม'}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )
+        })}
       </div>
     </>
   )

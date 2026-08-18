@@ -1,14 +1,18 @@
 import { useEffect, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import Header from '../components/Header'
-import { GRADIENTS, AMENITIES } from '../data/mock'
-import { getListing } from '../api/client'
+import { AMENITIES } from '../data/mock'
+import { photoStyle } from '../lib/photo'
+import { getListing, createBooking, calcBooking } from '../api/client'
 import { useSaved } from '../context/SavedContext'
+import { useAuth } from '../context/AuthContext'
 import './Property.css'
 
 export default function Property() {
   const { id } = useParams()
   const { isSaved, toggle } = useSaved()
+  const { isAuthed } = useAuth()
+  const nav = useNavigate()
   const [item, setItem] = useState(null)
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState(null)
@@ -18,6 +22,26 @@ export default function Property() {
     people: 1,
   })
   const [sent, setSent] = useState(false)
+  const [bookingBusy, setBookingBusy] = useState(false)
+  const [bookMsg, setBookMsg] = useState('')
+
+  // จองจริง — สร้างรายการใน DB แล้วไปจ่ายที่แดชบอร์ด
+  async function handleBook() {
+    if (!isAuthed) { nav('/login', { state: { from: `/property/${id}` } }); return }
+    setBookingBusy(true); setBookMsg('')
+    try {
+      await createBooking({
+        listing: item,
+        moveIn: booking.moveIn,
+        months: booking.months,
+        occupants: booking.people,
+      })
+      setBookMsg('✓ ส่งคำขอจองแล้ว — ไปชำระมัดจำที่แดชบอร์ด')
+      setTimeout(() => nav('/member'), 1600)
+    } catch (e) {
+      setBookMsg('✕ ' + e.message)
+    } finally { setBookingBusy(false) }
+  }
 
   useEffect(() => {
     let alive = true
@@ -57,9 +81,10 @@ export default function Property() {
     )
   }
 
-  const firstMonth = item.price
-  const deposit = item.price * item.depositMonths
-  const total = firstMonth + deposit
+  const calc = calcBooking(item, booking.months)
+  const firstMonth = calc.advance
+  const deposit = calc.deposit
+  const total = calc.total
 
   const amenityList = AMENITIES.filter((a) => item.amenities.includes(a.id))
 
@@ -100,7 +125,7 @@ export default function Property() {
 
         <div className="gal">
           {item.photos.slice(0, 5).map((p, i) => (
-            <div key={i} style={{ background: GRADIENTS[p] }}>
+            <div key={i} style={photoStyle(p)}>
               {i === 0 && <span className="more">📷 ดูรูปทั้งหมด {item.photoCount} รูป</span>}
             </div>
           ))}
@@ -212,9 +237,13 @@ export default function Property() {
             <button className="bk-cta" onClick={() => setSent(true)} disabled={sent}>
               {sent ? '✓ ส่งคำขอนัดชมแล้ว' : '📅 นัดชมห้อง'}
             </button>
+            <button className="bk-book" onClick={handleBook} disabled={bookingBusy}>
+              {bookingBusy ? 'กำลังส่งคำขอ...' : '🔒 จองและวางมัดจำ'}
+            </button>
+            {bookMsg && <p className={`bk-msg ${bookMsg.startsWith('✕') ? 'err' : ''}`}>{bookMsg}</p>}
             <button className="bk-alt">💬 ทักแชตเจ้าของ</button>
             <p className="bk-note">
-              {sent ? 'เจ้าของจะติดต่อกลับภายใน 24 ชม.' : 'ยังไม่มีการเรียกเก็บเงิน · นัดชมฟรี'}
+              {sent ? 'เจ้าของจะติดต่อกลับภายใน 24 ชม.' : 'นัดชมฟรี · จองแล้วเงินมัดจำพักในระบบจนเข้าอยู่'}
             </p>
 
             <div className="bk-calc">
@@ -227,8 +256,8 @@ export default function Property() {
                 <b>฿{deposit.toLocaleString()}</b>
               </div>
               <div className="bk-line">
-                <span>ค่าธรรมเนียมแพลตฟอร์ม</span>
-                <b style={{ color: 'var(--green)' }}>ฟรี</b>
+                <span>ค่าธรรมเนียมแพลตฟอร์ม (1%)</span>
+                <b>฿{calc.fee.toLocaleString()}</b>
               </div>
               <div className="bk-line bk-total">
                 <b>รวมวันเข้าอยู่</b>

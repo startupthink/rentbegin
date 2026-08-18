@@ -7,6 +7,7 @@ import Saved from './pages/Saved'
 import Member from './pages/Member'
 import Admin from './pages/Admin'
 import Login from './pages/Login'
+import { Privacy, Terms } from './pages/Legal'
 
 export default function App() {
   return (
@@ -16,6 +17,8 @@ export default function App() {
         <Route path="/property/:id" element={<Property />} />
         <Route path="/saved" element={<Saved />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/privacy" element={<Privacy />} />
+        <Route path="/terms" element={<Terms />} />
         <Route path="/member" element={<ProtectedRoute><Member /></ProtectedRoute>} />
         <Route path="/admin" element={<ProtectedRoute requireAdmin><Admin /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />

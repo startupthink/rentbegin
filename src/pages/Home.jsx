@@ -159,7 +159,8 @@ export default function Home() {
           <span className="ftr-links">
             <Link to="/saved">ที่บันทึกไว้</Link>
             <Link to="/member">สำหรับผู้ปล่อยเช่า</Link>
-            <Link to="/admin">แอดมิน</Link>
+            <Link to="/privacy">นโยบายความเป็นส่วนตัว</Link>
+            <Link to="/terms">ข้อกำหนดการใช้บริการ</Link>
           </span>
         </div>
       </footer>
