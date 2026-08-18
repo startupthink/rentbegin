@@ -11,17 +11,18 @@ import {
 } from '../api/client'
 import './Dashboard.css'
 
-const NAV = [
+// ตัวเลขบนเมนู = จำนวนจริงของบัญชีนี้
+const buildNav = ({ listings = 0, viewings = 0, rating } = {}) => [
   { id: 'overview',  icon: '🏠', label: 'ภาพรวม' },
-  { id: 'listings',  icon: '📋', label: 'ประกาศของฉัน', count: 9 },
-  { id: 'viewings',  icon: '📅', label: 'นัดชม', count: 6 },
-  { id: 'messages',  icon: '💬', label: 'ข้อความ', count: 4 },
+  { id: 'listings',  icon: '📋', label: 'ประกาศของฉัน', count: listings || undefined },
+  { id: 'viewings',  icon: '📅', label: 'นัดชม', count: viewings || undefined },
+  { id: 'messages',  icon: '💬', label: 'ข้อความ' },
   { id: 'contracts', icon: '📝', label: 'สัญญาเช่า' },
   { group: 'เงิน' },
   { id: 'revenue',   icon: '💳', label: 'รายรับ / มัดจำ' },
   { id: 'receipts',  icon: '🧾', label: 'ใบเสร็จ' },
   { group: 'บัญชี' },
-  { id: 'reviews',   icon: '⭐', label: 'รีวิว 4.8' },
+  { id: 'reviews',   icon: '⭐', label: rating ? `รีวิว ${rating}` : 'รีวิว' },
   { id: 'settings',  icon: '⚙️', label: 'ตั้งค่า' },
 ]
 
@@ -63,7 +64,13 @@ export default function Member() {
     <>
       <Header />
       <div className="app">
-        <Sidebar variant="member" profile={profile} items={NAV} active={tab} onSelect={setTab} />
+        <Sidebar
+          variant="member"
+          profile={profile}
+          items={buildNav({ listings: listings.length, viewings: viewings.length, rating: profile.rating })}
+          active={tab}
+          onSelect={setTab}
+        />
         <main className="main">
           {tab === 'overview' && (
             <OverviewTab
@@ -94,7 +101,10 @@ function OverviewTab({ profile, stats, tasks, listings, viewings, doneTasks, set
       <div className="phead">
         <div>
           <h2>สวัสดี {profile.name.split(' ')[0]} 👋</h2>
-          <p>วันนี้มีนัดชม 2 รายการ และข้อความใหม่ 4 ข้อความ</p>
+          <p>
+            {viewings.length > 0 ? `มีนัดชม ${viewings.length} รายการ` : 'ยังไม่มีนัดชม'}
+            {visibleTasks.length > 0 ? ` · ${visibleTasks.length} รายการต้องทำ` : ''}
+          </p>
         </div>
         <button className="btn-p" onClick={() => goTab('listings')}>+ ลงประกาศใหม่</button>
       </div>

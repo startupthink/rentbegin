@@ -9,11 +9,12 @@ import {
 } from '../api/client'
 import './Dashboard.css'
 
-const NAV = [
+// ตัวเลขบนเมนู = จำนวนจริงจากฐานข้อมูล (ไม่ใช่เลขค้างอีกต่อไป)
+const buildNav = ({ review = 0, kyc = 0, disputes = 0 } = {}) => [
   { id: 'dash',      icon: '📊', label: 'แดชบอร์ด' },
-  { id: 'review',    icon: '📋', label: 'ตรวจประกาศ', count: 11 },
-  { id: 'kyc',       icon: '🪪', label: 'ยืนยันตัวตน', count: 7 },
-  { id: 'disputes',  icon: '⚠️', label: 'ข้อพิพาท', count: 3 },
+  { id: 'review',    icon: '📋', label: 'ตรวจประกาศ', count: review || undefined },
+  { id: 'kyc',       icon: '🪪', label: 'ยืนยันตัวตน', count: kyc || undefined },
+  { id: 'disputes',  icon: '⚠️', label: 'ข้อพิพาท', count: disputes || undefined },
   { group: 'จัดการ' },
   { id: 'members',   icon: '👥', label: 'สมาชิก' },
   { id: 'listings',  icon: '🏠', label: 'ประกาศทั้งหมด' },
@@ -35,11 +36,15 @@ export default function Admin() {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(null)
   const [flash, setFlash] = useState('')
+  const [kycCount, setKycCount] = useState(0)
 
   useEffect(() => {
     let alive = true
-    Promise.all([getAdminStats(), getReviewQueue(), getDisputes()])
-      .then(([s, q, d]) => { if (!alive) return; setStats(s); setQueue(q); setDisputes(d) })
+    Promise.all([getAdminStats(), getReviewQueue(), getDisputes(), getAdminKyc()])
+      .then(([s, q, d, k]) => {
+        if (!alive) return
+        setStats(s); setQueue(q); setDisputes(d); setKycCount((k || []).length)
+      })
       .finally(() => { if (alive) setLoading(false) })
     return () => { alive = false }
   }, [])
@@ -60,7 +65,13 @@ export default function Admin() {
     <>
       <Header />
       <div className="app admin">
-        <Sidebar variant="admin" profile={ADMIN_PROFILE} items={NAV} active={tab} onSelect={setTab} />
+        <Sidebar
+          variant="admin"
+          profile={ADMIN_PROFILE}
+          items={buildNav({ review: queue.length, kyc: kycCount, disputes: disputes.length })}
+          active={tab}
+          onSelect={setTab}
+        />
         <main className="main">
           {flash && <div className="flash">{flash}</div>}
 

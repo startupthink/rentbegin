@@ -279,7 +279,10 @@ export async function getAdminStats() {
     activeContracts: C.length, contractsValue: `฿${(monthly / 1e6).toFixed(1)}M / เดือน`,
     feesThisMonth: fees, feesDeltaPct: 0,
     feesWeek: fees, feesWeekDeltaPct: 0,
-    feesChart: income.slice(0, 7).map((t) => ({ label: (t.date_text || '').split(' ')[0] || '•', value: Math.round(((t.amount || 0) / max) * 100) })),
+    feesChart: income.slice(0, 7).map((t) => ({
+      label: (t.date_text || '').split(' ').slice(0, 2).join(' ') || '•',
+      value: Math.round(((t.amount || 0) / max) * 100),
+    })),
   }
 }
 

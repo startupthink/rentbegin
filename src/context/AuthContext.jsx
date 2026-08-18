@@ -145,7 +145,7 @@ export function AuthProvider({ children }) {
   async function signInLine() {
     const base = import.meta.env.VITE_SUPABASE_URL
     if (!base) throw new Error('ยังไม่ได้ตั้งค่า Supabase (ดู SETUP-AUTH.md)')
-    const redirect = encodeURIComponent(`${window.location.origin}/member`)
+    const redirect = encodeURIComponent(`${window.location.origin}/`)
     window.location.href = `${base}/functions/v1/line-login?redirect=${redirect}`
   }
 
