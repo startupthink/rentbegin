@@ -75,8 +75,12 @@ describe('ตัวกรองหน้าแรกทำงาน', () => {
     renderAt('/')
     await waitFor(() => screen.getByText(/บ้านหลังต่อไป/))
     fireEvent.click(screen.getByText(/⚙ ตัวกรอง/))
-    // "สิ่งอำนวยความสะดวก" มีเฉพาะในแผงตัวกรอง
-    await waitFor(() => expect(screen.getByText('สิ่งอำนวยความสะดวก')).toBeInTheDocument())
+    // หัวข้อเหล่านี้มีเฉพาะในแผงตัวกรอง
+    await waitFor(() => {
+      expect(screen.getByText('สิ่งอำนวยความสะดวกส่วนกลาง')).toBeInTheDocument()
+      expect(screen.getByText('เครื่องใช้ไฟฟ้าและเฟอร์นิเจอร์')).toBeInTheDocument()
+      expect(screen.getByText('ห้องนอน')).toBeInTheDocument()
+    })
   })
 
   it('ค้นหาด้วยฟอร์ม hero ได้', async () => {

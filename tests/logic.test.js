@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from 'vitest'
 vi.mock('../src/lib/supabase', () => ({ HAS_SUPABASE: false, supabase: null }))
 import { calcBooking } from '../src/api/client'
 import { photoStyle, isPhotoUrl } from '../src/lib/photo'
-import { PROPERTY_TYPES, ROOM_FEATURES, LISTING_TYPES, BUDGET_RANGES, BEDROOM_OPTIONS, AMENITIES } from '../src/data/constants'
+import { PROPERTY_TYPES, ROOM_FEATURES, APPLIANCES, LISTING_TYPES, BUDGET_RANGES, BEDROOM_OPTIONS, AMENITIES } from '../src/data/constants'
 
 describe('คำนวณยอดจอง', () => {
   it('ค่าเช่า 15000 มัดจำ 2 ล่วงหน้า 1 → รวมถูกต้อง', () => {
@@ -48,12 +48,48 @@ describe('ค่าคงที่ครบถ้วน', () => {
   it('มีห้องแถวในประเภททรัพย์', () => {
     expect(PROPERTY_TYPES.find((t) => t.id === 'rowhouse')?.label).toBe('ห้องแถว')
   })
-  it('มีตัวเลือกห้องที่ผู้ใช้ขอ', () => {
+  it('หมวดห้อง มีเฉพาะห้อง/พื้นที่ ไม่มีเครื่องใช้ไฟฟ้า', () => {
     const ids = ROOM_FEATURES.map((r) => r.id)
     expect(ids).toContain('living')    // ห้องนั่งเล่น
     expect(ids).toContain('kitchen')   // ห้องครัว
-    expect(ids).toContain('bathtub')
+    expect(ids).toContain('balcony')
+    // ต้องไม่มีเครื่องใช้ไฟฟ้า/ของใช้ปนอยู่
+    for (const bad of ['bathtub', 'waterheat', 'aircon', 'washer', 'furnished', 'tv', 'fridge']) {
+      expect(ids, `ROOM_FEATURES ไม่ควรมี ${bad}`).not.toContain(bad)
+    }
     expect(ROOM_FEATURES.length).toBeGreaterThanOrEqual(10)
+  })
+
+  it('หมวดเครื่องใช้ไฟฟ้า แยกออกมาแล้วและครบ', () => {
+    const ids = APPLIANCES.map((a) => a.id)
+    for (const need of ['aircon', 'washer', 'fridge', 'tv', 'waterheat', 'bathtub', 'furnished', 'microwave', 'stove']) {
+      expect(ids, `APPLIANCES ต้องมี ${need}`).toContain(need)
+    }
+    expect(APPLIANCES.length).toBeGreaterThanOrEqual(12)
+  })
+
+  it('หมวดสิ่งอำนวยความสะดวก เป็นของส่วนกลาง/ทำเล เท่านั้น', () => {
+    const ids = AMENITIES.map((a) => a.id)
+    expect(ids).toContain('pool')
+    expect(ids).toContain('gym')
+    expect(ids).toContain('bts')
+    // เครื่องใช้ไฟฟ้าต้องไม่อยู่ในหมวดนี้แล้ว
+    for (const bad of ['aircon', 'washer', 'furnished', 'waterheat', 'bathtub']) {
+      expect(ids, `AMENITIES ไม่ควรมี ${bad}`).not.toContain(bad)
+    }
+  })
+
+  it('3 หมวดไม่มี id ทับซ้อนกัน', () => {
+    const r = new Set(ROOM_FEATURES.map((x) => x.id))
+    const a = new Set(APPLIANCES.map((x) => x.id))
+    const m = new Set(AMENITIES.map((x) => x.id))
+    for (const id of r) {
+      expect(a.has(id), `${id} ซ้ำระหว่างห้องกับเครื่องใช้ไฟฟ้า`).toBe(false)
+      expect(m.has(id), `${id} ซ้ำระหว่างห้องกับส่วนกลาง`).toBe(false)
+    }
+    for (const id of a) {
+      expect(m.has(id), `${id} ซ้ำระหว่างเครื่องใช้ไฟฟ้ากับส่วนกลาง`).toBe(false)
+    }
   })
   it('มีโหมดเช่า/ขาย/ทั้งสอง', () => {
     expect(LISTING_TYPES.map((l) => l.id)).toEqual(['rent', 'sale', 'both'])
@@ -69,7 +105,7 @@ describe('ค่าคงที่ครบถ้วน', () => {
     expect(BEDROOM_OPTIONS.find((b) => b.id === '2').min).toBe(2)
   })
   it('id ทุกชุดไม่ซ้ำ', () => {
-    for (const list of [PROPERTY_TYPES, ROOM_FEATURES, AMENITIES, LISTING_TYPES, BUDGET_RANGES, BEDROOM_OPTIONS]) {
+    for (const list of [PROPERTY_TYPES, ROOM_FEATURES, APPLIANCES, AMENITIES, LISTING_TYPES, BUDGET_RANGES, BEDROOM_OPTIONS]) {
       const ids = list.map((x) => x.id)
       expect(new Set(ids).size).toBe(ids.length)
     }

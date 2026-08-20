@@ -4,10 +4,11 @@ import Header from '../components/Header'
 import UserPanel from '../components/UserPanel'
 import PropertyCard from '../components/PropertyCard'
 import {
-  PROPERTY_TYPES, LISTING_TYPES, AMENITIES,
+  PROPERTY_TYPES, LISTING_TYPES, AMENITIES, APPLIANCES,
   BUDGET_RANGES, BEDROOM_OPTIONS,
 } from '../data/constants'
 import { getListings } from '../api/client'
+import { useAutoRefresh } from '../lib/useAutoRefresh'
 import './Home.css'
 
 // ชิปกรองด่วน — map ไปยัง amenity จริงในฐานข้อมูล
@@ -45,25 +46,35 @@ export default function Home() {
     setParams(next, { replace: true })
   }, [params, setParams])
 
-  useEffect(() => {
-    let alive = true
-    setLoading(true)
+  // ดึงประกาศตามตัวกรองปัจจุบัน
+  const fetchListings = useCallback(async (showSpinner = true) => {
+    if (showSpinner) setLoading(true)
     const budget = BUDGET_RANGES.find((b) => b.id === budgetId) || BUDGET_RANGES[0]
     const bed = BEDROOM_OPTIONS.find((b) => b.id === bedroomId) || BEDROOM_OPTIONS[0]
-
-    getListings({
-      type, q, listingType,
-      minPrice: budget.min || null,
-      maxPrice: budget.max,
-      minBedrooms: bed.min,
-      amenities: chips,
-    })
-      .then((data) => { if (alive) setItems(data) })
-      .catch(() => { if (alive) setItems([]) })
-      .finally(() => { if (alive) setLoading(false) })
-    return () => { alive = false }
+    // ชิปอาจเป็นได้ทั้งสิ่งอำนวยความสะดวกและเครื่องใช้ไฟฟ้า — แยกให้ถูกหมวด
+    const amenityIds = AMENITIES.map((a) => a.id)
+    try {
+      const data = await getListings({
+        type, q, listingType,
+        minPrice: budget.min || null,
+        maxPrice: budget.max,
+        minBedrooms: bed.min,
+        amenities: chips.filter((c) => amenityIds.includes(c)),
+        appliances: chips.filter((c) => !amenityIds.includes(c)),
+      })
+      setItems(data)
+    } catch {
+      setItems([])
+    } finally {
+      setLoading(false)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [type, q, listingType, budgetId, bedroomId, params.get('chips')])
+
+  useEffect(() => { fetchListings(true) }, [fetchListings])
+
+  // กลับมาที่หน้านี้เมื่อไหร่ → ดึงข้อมูลใหม่เงียบๆ (ไม่กระพริบ)
+  useAutoRefresh(() => fetchListings(false))
 
   function doSearch(e) {
     e.preventDefault()
@@ -158,7 +169,17 @@ export default function Home() {
             </div>
 
             <div className="fp-grp">
-              <label>สิ่งอำนวยความสะดวก</label>
+              <label>เครื่องใช้ไฟฟ้าและเฟอร์นิเจอร์</label>
+              <div className="fp-chips">
+                {APPLIANCES.map((a) => (
+                  <button key={a.id} className={chips.includes(a.id) ? 'on' : ''}
+                    onClick={() => toggleChip(a.id)}>{a.icon} {a.label}</button>
+                ))}
+              </div>
+            </div>
+
+            <div className="fp-grp">
+              <label>สิ่งอำนวยความสะดวกส่วนกลาง</label>
               <div className="fp-chips">
                 {AMENITIES.map((a) => (
                   <button key={a.id} className={chips.includes(a.id) ? 'on' : ''}
@@ -250,7 +271,7 @@ export default function Home() {
                 </span>
               )}
               {chips.map((c) => {
-                const a = AMENITIES.find((x) => x.id === c) || QUICK_CHIPS.find((x) => x.id === c)
+                const a = AMENITIES.find((x) => x.id === c) || APPLIANCES.find((x) => x.id === c) || QUICK_CHIPS.find((x) => x.id === c)
                 return (
                   <span className="af-tag" key={c}>
                     {a?.label || c}

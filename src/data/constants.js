@@ -15,16 +15,40 @@ export const PROPERTY_TYPES = [
   { id: 'land',      label: 'ที่ดิน',       icon: '🌾' },
 ]
 
+// สิ่งอำนวยความสะดวกของโครงการ / ทำเล (ไม่ใช่ของในห้อง)
 export const AMENITIES = [
-  { id: 'aircon',    label: 'แอร์',            icon: '❄️' },
-  { id: 'furnished', label: 'เฟอร์ครบ',        icon: '🛋️' },
-  { id: 'washer',    label: 'เครื่องซักผ้า',   icon: '🧺' },
-  { id: 'bts',       label: 'ติดรถไฟฟ้า',      icon: '🚇' },
-  { id: 'parking',   label: 'ที่จอดรถ',        icon: '🅿️' },
-  { id: 'pet',       label: 'เลี้ยงสัตว์ได้',   icon: '🐾' },
-  { id: 'pool',      label: 'สระว่ายน้ำ',      icon: '🏊' },
-  { id: 'gym',       label: 'ฟิตเนส',          icon: '🏋️' },
-  { id: 'security',  label: 'รปภ. 24 ชม.',     icon: '🛡️' },
+  { id: 'bts',       label: 'ติดรถไฟฟ้า',     icon: '🚇' },
+  { id: 'parking',   label: 'ที่จอดรถ',       icon: '🅿️' },
+  { id: 'pet',       label: 'เลี้ยงสัตว์ได้',  icon: '🐾' },
+  { id: 'pool',      label: 'สระว่ายน้ำ',     icon: '🏊' },
+  { id: 'gym',       label: 'ฟิตเนส',         icon: '🏋️' },
+  { id: 'security',  label: 'รปภ. 24 ชม.',    icon: '🛡️' },
+  { id: 'cctv',      label: 'กล้องวงจรปิด',   icon: '📹' },
+  { id: 'lift',      label: 'ลิฟต์',          icon: '🛗' },
+  { id: 'coworking', label: 'Co-working',     icon: '💼' },
+  { id: 'market',    label: 'ใกล้ตลาด/ร้านค้า', icon: '🏪' },
+  { id: 'school',    label: 'ใกล้โรงเรียน',    icon: '🏫' },
+  { id: 'hospital',  label: 'ใกล้โรงพยาบาล',  icon: '🏥' },
+]
+
+// เครื่องใช้ไฟฟ้าและเฟอร์นิเจอร์ในห้อง
+export const APPLIANCES = [
+  { id: 'furnished',  label: 'เฟอร์นิเจอร์ครบ',  icon: '🛋️' },
+  { id: 'aircon',     label: 'เครื่องปรับอากาศ', icon: '❄️' },
+  { id: 'waterheat',  label: 'เครื่องทำน้ำอุ่น', icon: '🚿' },
+  { id: 'washer',     label: 'เครื่องซักผ้า',    icon: '🧺' },
+  { id: 'fridge',     label: 'ตู้เย็น',          icon: '🧊' },
+  { id: 'tv',         label: 'โทรทัศน์',         icon: '📺' },
+  { id: 'microwave',  label: 'ไมโครเวฟ',        icon: '📡' },
+  { id: 'stove',      label: 'เตาไฟฟ้า/แก๊ส',   icon: '🔥' },
+  { id: 'hood',       label: 'เครื่องดูดควัน',   icon: '💨' },
+  { id: 'oven',       label: 'เตาอบ',           icon: '🍞' },
+  { id: 'dishwasher', label: 'เครื่องล้างจาน',   icon: '🍽️' },
+  { id: 'bathtub',    label: 'อ่างอาบน้ำ',       icon: '🛁' },
+  { id: 'bed',        label: 'เตียง + ที่นอน',   icon: '🛏️' },
+  { id: 'wardrobe',   label: 'ตู้เสื้อผ้า',      icon: '👔' },
+  { id: 'desk',       label: 'โต๊ะทำงาน',        icon: '🪑' },
+  { id: 'internet',   label: 'อินเทอร์เน็ต/WiFi', icon: '📶' },
 ]
 
 // ประเภทประกาศ — เช่า / ขาย / ทั้งสอง
@@ -34,20 +58,22 @@ export const LISTING_TYPES = [
   { id: 'both', label: 'เช่าหรือขาย',  icon: '🤝', short: 'เช่า/ขาย' },
 ]
 
-// ห้องและพื้นที่ใช้สอยภายใน
+// ห้องและพื้นที่ใช้สอย — เฉพาะ "ห้อง/พื้นที่" เท่านั้น
+// (เครื่องใช้ไฟฟ้าอยู่ใน APPLIANCES · ส่วนกลางอยู่ใน AMENITIES)
 export const ROOM_FEATURES = [
-  { id: 'living',   label: 'ห้องนั่งเล่น',   icon: '🛋️' },
-  { id: 'kitchen',  label: 'ห้องครัว',       icon: '🍳' },
-  { id: 'dining',   label: 'ห้องอาหาร',      icon: '🍽️' },
-  { id: 'balcony',  label: 'ระเบียง',        icon: '🌤️' },
-  { id: 'workroom', label: 'ห้องทำงาน',      icon: '💻' },
-  { id: 'laundry',  label: 'พื้นที่ซักล้าง', icon: '🧺' },
-  { id: 'storage',  label: 'ห้องเก็บของ',    icon: '📦' },
-  { id: 'maidroom', label: 'ห้องแม่บ้าน',    icon: '🚪' },
+  { id: 'living',   label: 'ห้องนั่งเล่น',    icon: '🛋️' },
+  { id: 'kitchen',  label: 'ห้องครัว',        icon: '🍳' },
+  { id: 'dining',   label: 'ห้องอาหาร',       icon: '🍽️' },
+  { id: 'workroom', label: 'ห้องทำงาน',       icon: '💻' },
+  { id: 'storage',  label: 'ห้องเก็บของ',     icon: '📦' },
+  { id: 'maidroom', label: 'ห้องแม่บ้าน',     icon: '🚪' },
+  { id: 'walkin',   label: 'ห้องแต่งตัว',     icon: '👗' },
+  { id: 'prayer',   label: 'ห้องพระ',         icon: '🙏' },
+  { id: 'laundry',  label: 'ห้องซักรีด',      icon: '🧺' },
+  { id: 'balcony',  label: 'ระเบียง',         icon: '🌤️' },
+  { id: 'terrace',  label: 'ดาดฟ้า / เฉลียง', icon: '🏙️' },
   { id: 'garden',   label: 'สวน / พื้นที่นอกบ้าน', icon: '🌳' },
-  { id: 'garage',   label: 'โรงจอดรถในตัว',  icon: '🚗' },
-  { id: 'bathtub',  label: 'อ่างอาบน้ำ',     icon: '🛁' },
-  { id: 'waterheat',label: 'เครื่องทำน้ำอุ่น', icon: '🚿' },
+  { id: 'garage',   label: 'โรงจอดรถในตัว',   icon: '🚗' },
 ]
 
 // ช่วงราคาสำหรับตัวกรอง (บาท/เดือน)

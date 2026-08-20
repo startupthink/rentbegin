@@ -3,7 +3,7 @@ import Header from '../components/Header'
 import Sidebar from '../components/Sidebar'
 import PropertyCard from '../components/PropertyCard'
 import { Link } from 'react-router-dom'
-import { PROPERTY_TYPES, AMENITIES, ROOM_FEATURES, LISTING_TYPES } from '../data/constants'
+import { PROPERTY_TYPES, AMENITIES, APPLIANCES, ROOM_FEATURES, LISTING_TYPES } from '../data/constants'
 import { photoStyle } from '../lib/photo'
 import {
   getMemberProfile, getMemberStats, getMemberTasks,
@@ -15,6 +15,7 @@ import {
   getMyBookings, respondBooking, payBooking,
   createContractFromBooking, getMyContracts, signContract,
 } from '../api/client'
+import { useAutoRefresh } from '../lib/useAutoRefresh'
 import './Dashboard.css'
 
 // ตัวเลขบนเมนู = จำนวนจริงของบัญชีนี้
@@ -67,6 +68,9 @@ export default function Member() {
       .finally(() => { if (alive) setLoading(false) })
     return () => { alive = false }
   }, [reload])
+
+  // กลับมาที่แท็บนี้ → โหลดข้อมูลล่าสุด
+  useAutoRefresh(() => { reload().catch(() => {}) })
 
   if (loading) return (<><Header /><div className="spin" /></>)
 
@@ -232,8 +236,11 @@ function ListingsTab({ listings, profile, onChanged }) {
   const BLANK = {
     type: 'condo', listingType: 'rent', title: '', district: '', province: 'กรุงเทพฯ',
     availableFrom: '', bedrooms: 1, bathrooms: 1, sizeSqm: 30,
-    price: 15000, salePrice: '', amenities: ['aircon', 'furnished'],
-    rooms: ['living', 'kitchen'], depositMonths: 2, minLeaseMonths: 12,
+    price: 15000, salePrice: '',
+    rooms: ['living', 'kitchen'],
+    appliances: ['aircon', 'furnished'],
+    amenities: [],
+    depositMonths: 2, minLeaseMonths: 12,
     description: '', floorNo: '', totalFloors: '', contactPhone: '', contactLine: '',
   }
   const [form, setForm] = useState(BLANK)
@@ -485,7 +492,7 @@ function ListingsTab({ listings, profile, onChanged }) {
                         onChange={(e) => setForm({ ...form, sizeSqm: e.target.value })} /></div>
                   </div>
 
-                  <div className="fr"><label>ห้องและพื้นที่ใช้สอย</label>
+                  <div className="fr"><label>🚪 ห้องและพื้นที่ใช้สอย</label>
                     <div className="chips">
                       {ROOM_FEATURES.map((r) => (
                         <button key={r.id} className={`chip ${form.rooms.includes(r.id) ? 'on' : ''}`}
@@ -494,7 +501,16 @@ function ListingsTab({ listings, profile, onChanged }) {
                     </div>
                   </div>
 
-                  <div className="fr"><label>จุดเด่น / สิ่งอำนวยความสะดวก</label>
+                  <div className="fr"><label>🔌 เครื่องใช้ไฟฟ้าและเฟอร์นิเจอร์</label>
+                    <div className="chips">
+                      {APPLIANCES.map((a) => (
+                        <button key={a.id} className={`chip ${form.appliances.includes(a.id) ? 'on' : ''}`}
+                          onClick={() => toggleIn('appliances', a.id)}>{a.icon} {a.label}</button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="fr"><label>🏢 สิ่งอำนวยความสะดวกส่วนกลาง / ทำเล</label>
                     <div className="chips">
                       {AMENITIES.map((a) => (
                         <button key={a.id} className={`chip ${form.amenities.includes(a.id) ? 'on' : ''}`}

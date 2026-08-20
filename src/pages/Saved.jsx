@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import Header from '../components/Header'
 import PropertyCard from '../components/PropertyCard'
 import { getListingsByIds } from '../api/client'
+import { useAutoRefresh } from '../lib/useAutoRefresh'
 import { useSaved } from '../context/SavedContext'
 import './Home.css'
 import './Saved.css'
@@ -13,16 +14,16 @@ export default function Saved() {
   const [loading, setLoading] = useState(true)
 
   // ดึงประกาศจริงตาม id ที่บันทึกไว้
-  useEffect(() => {
-    let alive = true
+  const load = useCallback(async (showSpinner = true) => {
     if (!ids.length) { setItems([]); setLoading(false); return }
-    setLoading(true)
-    getListingsByIds(ids)
-      .then((d) => { if (alive) setItems(d) })
-      .catch(() => { if (alive) setItems([]) })
-      .finally(() => { if (alive) setLoading(false) })
-    return () => { alive = false }
+    if (showSpinner) setLoading(true)
+    try { setItems(await getListingsByIds(ids)) }
+    catch { setItems([]) }
+    finally { setLoading(false) }
   }, [ids])
+
+  useEffect(() => { load(true) }, [load])
+  useAutoRefresh(() => load(false))
 
   return (
     <>

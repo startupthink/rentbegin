@@ -58,6 +58,7 @@ function mapListing(r) {
     listingType: r.listing_type || 'rent',
     salePrice: r.sale_price || null,
     rooms: r.rooms || [],
+    appliances: r.appliances || [],
     floorNo: r.floor_no || '', totalFloors: r.total_floors || '',
     direction: r.direction || '',
     contactPhone: r.contact_phone || '', contactLine: r.contact_line || '',
@@ -80,7 +81,7 @@ async function myProfile() {
 export async function getListings({
   type = 'all', q = '', listingType = 'all',
   minPrice = null, maxPrice = null, minBedrooms = null,
-  amenities = [], petAllowed = null,
+  amenities = [], appliances = [], petAllowed = null,
 } = {}) {
   if (!HAS_SUPABASE) { await delay(); return [] }
   let query = supabase.from('listings').select(LISTING_SELECT)
@@ -94,6 +95,7 @@ export async function getListings({
   if (minBedrooms != null) query = query.gte('bedrooms', minBedrooms)
   if (petAllowed === true) query = query.eq('pet_allowed', true)
   if (amenities.length) query = query.contains('amenities', amenities)
+  if (appliances.length) query = query.contains('appliances', appliances)
   if (q.trim()) {
     const k = q.trim()
     query = query.or(`title.ilike.%${k}%,district.ilike.%${k}%,province.ilike.%${k}%,full_title.ilike.%${k}%`)
@@ -183,6 +185,7 @@ function listingRow(payload) {
     description: payload.description || '',
     amenities: payload.amenities || [],
     rooms: payload.rooms || [],
+    appliances: payload.appliances || [],
     pet_allowed: (payload.amenities || []).includes('pet'),
     floor_no: payload.floorNo || null,
     total_floors: payload.totalFloors || null,
@@ -257,6 +260,7 @@ export async function getListingForEdit(id) {
     minLeaseMonths: data.min_lease_months, depositMonths: data.deposit_months,
     description: data.description || '',
     amenities: data.amenities || [], rooms: data.rooms || [],
+    appliances: data.appliances || [],
     floorNo: data.floor_no || '', totalFloors: data.total_floors || '',
     contactPhone: data.contact_phone || '', contactLine: data.contact_line || '',
     photos: data.photos || [], status: data.status,

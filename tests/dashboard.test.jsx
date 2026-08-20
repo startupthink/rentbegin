@@ -41,7 +41,7 @@ vi.mock('../src/api/client', async () => {
       id, title: 'คอนโดทดสอบ', type: 'condo', listingType: 'rent', salePrice: '',
       district: 'ห้วยขวาง', province: 'กรุงเทพฯ', price: 15000, bedrooms: 1, bathrooms: 1,
       sizeSqm: 30, availableFrom: 'ว่างแล้ว', minLeaseMonths: 12, depositMonths: 2,
-      description: 'ทดสอบ', amenities: ['aircon'], rooms: ['living'],
+      description: 'ทดสอบ', amenities: ['pool'], rooms: ['living'], appliances: ['aircon'],
       floorNo: '', totalFloors: '', contactPhone: '', contactLine: '', photos: [], status: 'live',
     }),
   }
@@ -138,9 +138,18 @@ describe('แดชบอร์ดสมาชิก', () => {
     await waitFor(() => expect(screen.getByText('ประกาศนี้ต้องการ')).toBeInTheDocument())
     expect(screen.getByText(/🏷️ ขาย/)).toBeInTheDocument()
     expect(screen.getByText(/🤝 เช่าหรือขาย/)).toBeInTheDocument()
+    // ต้องมี 3 หมวดแยกกันชัดเจน
+    expect(screen.getByText(/🚪 ห้องและพื้นที่ใช้สอย/)).toBeInTheDocument()
+    expect(screen.getByText(/🔌 เครื่องใช้ไฟฟ้าและเฟอร์นิเจอร์/)).toBeInTheDocument()
+    expect(screen.getByText(/🏢 สิ่งอำนวยความสะดวกส่วนกลาง/)).toBeInTheDocument()
+    // ห้อง
     expect(screen.getByText(/ห้องนั่งเล่น/)).toBeInTheDocument()
     expect(screen.getByText(/ห้องครัว/)).toBeInTheDocument()
     expect(screen.getByText(/ระเบียง/)).toBeInTheDocument()
+    // เครื่องใช้ไฟฟ้า
+    expect(screen.getByText(/ตู้เย็น/)).toBeInTheDocument()
+    expect(screen.getByText(/เครื่องปรับอากาศ/)).toBeInTheDocument()
+    expect(screen.getByText(/เครื่องทำน้ำอุ่น/)).toBeInTheDocument()
   })
 
   it('เลือกโหมดขาย → ขั้นที่ 3 มีช่องราคาขาย', async () => {

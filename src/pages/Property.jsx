@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import Header from '../components/Header'
 import Lightbox from '../components/Lightbox'
-import { AMENITIES, ROOM_FEATURES, LISTING_TYPES } from '../data/constants'
+import { AMENITIES, APPLIANCES, ROOM_FEATURES, LISTING_TYPES } from '../data/constants'
 import { photoStyle } from '../lib/photo'
 import { getListing, createBooking, calcBooking } from '../api/client'
+import { useAutoRefresh } from '../lib/useAutoRefresh'
 import { useSaved } from '../context/SavedContext'
 import { useAuth } from '../context/AuthContext'
 import './Property.css'
@@ -68,20 +69,27 @@ export default function Property() {
     } finally { setBookingBusy(false) }
   }
 
-  useEffect(() => {
-    let alive = true
-    setLoading(true)
-    setErr(null)
-    getListing(id)
-      .then((d) => {
-        if (!alive) return
-        setItem(d)
-        setBooking((b) => ({ ...b, moveIn: d.availableFrom, months: d.minLeaseMonths }))
-      })
-      .catch((e) => { if (alive) setErr(e.message) })
-      .finally(() => { if (alive) setLoading(false) })
-    return () => { alive = false }
+  const load = useCallback(async (showSpinner = true) => {
+    if (showSpinner) { setLoading(true); setErr(null) }
+    try {
+      const d = await getListing(id)
+      setItem(d)
+      setBooking((b) => ({
+        ...b,
+        moveIn: b.moveIn || d.availableFrom,
+        months: b.months || d.minLeaseMonths,
+      }))
+    } catch (e) {
+      if (showSpinner) setErr(e.message)
+    } finally {
+      setLoading(false)
+    }
   }, [id])
+
+  useEffect(() => { load(true) }, [load])
+
+  // กลับมาที่หน้านี้ → ดึงข้อมูลล่าสุด (เห็นราคาที่เพิ่งแก้ทันที)
+  useAutoRefresh(() => load(false))
 
   if (loading) {
     return (
@@ -113,6 +121,7 @@ export default function Property() {
 
   const amenityList = AMENITIES.filter((a) => (item.amenities || []).includes(a.id))
   const roomList = ROOM_FEATURES.filter((r) => (item.rooms || []).includes(r.id))
+  const applianceList = APPLIANCES.filter((a) => (item.appliances || []).includes(a.id))
   const forSale = item.listingType === 'sale' || item.listingType === 'both'
   const forRent = item.listingType !== 'sale'
   const listingBadge = LISTING_TYPES.find((l) => l.id === item.listingType)
@@ -215,9 +224,20 @@ export default function Property() {
               </div>
             )}
 
+            {applianceList.length > 0 && (
+              <div className="dsec">
+                <h3>เครื่องใช้ไฟฟ้าและเฟอร์นิเจอร์</h3>
+                <div className="amen">
+                  {applianceList.map((a) => (
+                    <div key={a.id}>{a.icon} {a.label}</div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {amenityList.length > 0 && (
               <div className="dsec">
-                <h3>สิ่งอำนวยความสะดวก</h3>
+                <h3>สิ่งอำนวยความสะดวกส่วนกลาง</h3>
                 <div className="amen">
                   {amenityList.map((a) => (
                     <div key={a.id}>{a.icon} {a.label}</div>
