@@ -55,6 +55,12 @@ function mapListing(r) {
     availableFrom: r.available_from, minLeaseMonths: r.min_lease_months,
     photos: r.photos || [], photoCount: r.photo_count, amenities: r.amenities || [],
     petAllowed: r.pet_allowed, description: r.description || '', status: r.status, views: r.views,
+    listingType: r.listing_type || 'rent',
+    salePrice: r.sale_price || null,
+    rooms: r.rooms || [],
+    floorNo: r.floor_no || '', totalFloors: r.total_floors || '',
+    direction: r.direction || '',
+    contactPhone: r.contact_phone || '', contactLine: r.contact_line || '',
     owner: mapOwner(r.owner),
   }
 }
@@ -71,11 +77,28 @@ async function myProfile() {
 // ===================================================================
 // LISTINGS
 // ===================================================================
-export async function getListings({ type = 'all', q = '' } = {}) {
+export async function getListings({
+  type = 'all', q = '', listingType = 'all',
+  minPrice = null, maxPrice = null, minBedrooms = null,
+  amenities = [], petAllowed = null,
+} = {}) {
   if (!HAS_SUPABASE) { await delay(); return [] }
-  let query = supabase.from('listings').select(LISTING_SELECT).eq('status', 'live').order('created_at', { ascending: false })
+  let query = supabase.from('listings').select(LISTING_SELECT)
+    .eq('status', 'live')
+    .order('created_at', { ascending: false })
+
   if (type !== 'all') query = query.eq('type', type)
-  if (q.trim()) query = query.or(`title.ilike.%${q}%,district.ilike.%${q}%,province.ilike.%${q}%`)
+  if (listingType !== 'all') query = query.in('listing_type', [listingType, 'both'])
+  if (minPrice != null) query = query.gte('price', minPrice)
+  if (maxPrice != null) query = query.lte('price', maxPrice)
+  if (minBedrooms != null) query = query.gte('bedrooms', minBedrooms)
+  if (petAllowed === true) query = query.eq('pet_allowed', true)
+  if (amenities.length) query = query.contains('amenities', amenities)
+  if (q.trim()) {
+    const k = q.trim()
+    query = query.or(`title.ilike.%${k}%,district.ilike.%${k}%,province.ilike.%${k}%,full_title.ilike.%${k}%`)
+  }
+
   const { data, error } = await query
   if (error) throw error
   return (data || []).map(mapListing)
@@ -139,19 +162,15 @@ export async function deleteListingPhoto(url) {
   await supabase.storage.from('listing-photos').remove([path])
 }
 
-export async function createListing(payload) {
-  if (!HAS_SUPABASE) { await delay(300); return { ok: true, id: 'RB-NEW', ...payload } }
-  const prof = await myProfile()
-  if (!prof) throw new Error('ต้องเข้าสู่ระบบก่อน')
-  const id = 'RB-' + Math.floor(1000 + Math.random() * 9000)
-  const row = {
-    id,
-    slug: (payload.title || id).toString().trim().toLowerCase().replace(/\s+/g, '-').slice(0, 40) + '-' + id.slice(-4),
-    owner_id: prof.id,
+// สร้าง row จากฟอร์ม — ใช้ร่วมกันทั้งตอนสร้างและแก้ไข
+function listingRow(payload) {
+  return {
     title: payload.title || 'ประกาศใหม่',
     full_title: payload.title || 'ประกาศใหม่',
     type: payload.type,
     type_label: TYPE_LABELS[payload.type] || payload.type,
+    listing_type: payload.listingType || 'rent',
+    sale_price: payload.listingType === 'rent' ? null : (Number(payload.salePrice) || null),
     district: payload.district,
     province: payload.province || 'กรุงเทพฯ',
     price: Number(payload.price) || 0,
@@ -163,14 +182,85 @@ export async function createListing(payload) {
     deposit_months: Number(payload.depositMonths) || 2,
     description: payload.description || '',
     amenities: payload.amenities || [],
+    rooms: payload.rooms || [],
+    pet_allowed: (payload.amenities || []).includes('pet'),
+    floor_no: payload.floorNo || null,
+    total_floors: payload.totalFloors || null,
+    contact_phone: payload.contactPhone || null,
+    contact_line: payload.contactLine || null,
     photos: payload.photos?.length ? payload.photos : ['g1', 'g6', 'g3'],
     photo_count: payload.photos?.length || 3,
+  }
+}
+
+export async function createListing(payload) {
+  if (!HAS_SUPABASE) { await delay(300); return { ok: true, id: 'RB-NEW', ...payload } }
+  const prof = await myProfile()
+  if (!prof) throw new Error('ต้องเข้าสู่ระบบก่อน')
+  const id = 'RB-' + Math.floor(1000 + Math.random() * 9000)
+  const { error } = await supabase.from('listings').insert({
+    id,
+    slug: (payload.title || id).toString().trim().toLowerCase().replace(/\s+/g, '-').slice(0, 40) + '-' + id.slice(-4),
+    owner_id: prof.id,
     status: 'pending',
     verified: prof.verified,
-  }
-  const { error } = await supabase.from('listings').insert(row)
+    ...listingRow(payload),
+  })
   if (error) throw error
   return { ok: true, id }
+}
+
+// แก้ไขประกาศ — เจ้าของหรือแอดมินเท่านั้น (บังคับด้วย RLS)
+export async function updateListing(id, payload) {
+  if (!HAS_SUPABASE) { await delay(300); return { ok: true, id } }
+  const { error } = await supabase.from('listings').update(listingRow(payload)).eq('id', id)
+  if (error) throw error
+  return { ok: true, id }
+}
+
+// เปลี่ยนสถานะเร็วๆ — เช่น ปิดประกาศเมื่อปล่อยเช่าแล้ว
+export async function setListingStatus(id, status) {
+  if (!HAS_SUPABASE) { await delay(200); return { ok: true } }
+  const { error } = await supabase.from('listings').update({ status }).eq('id', id)
+  if (error) throw error
+  return { ok: true }
+}
+
+// ลบประกาศ พร้อมลบรูปใน Storage ที่ผูกอยู่
+export async function deleteListing(id) {
+  if (!HAS_SUPABASE) { await delay(300); return { ok: true } }
+  const { data: l } = await supabase.from('listings').select('photos').eq('id', id).maybeSingle()
+  for (const url of l?.photos || []) {
+    if (typeof url === 'string' && url.startsWith('http')) {
+      await deleteListingPhoto(url).catch(() => {})
+    }
+  }
+  const { error } = await supabase.from('listings').delete().eq('id', id)
+  if (error) throw error
+  return { ok: true }
+}
+
+// ดึงประกาศเดียวแบบเต็ม (ใช้ตอนเปิดฟอร์มแก้ไข)
+export async function getListingForEdit(id) {
+  if (!HAS_SUPABASE) { await delay(); return null }
+  const { data, error } = await supabase.from('listings').select('*').eq('id', id).maybeSingle()
+  if (error) throw error
+  if (!data) return null
+  return {
+    id: data.id,
+    title: data.title, type: data.type,
+    listingType: data.listing_type || 'rent',
+    salePrice: data.sale_price || '',
+    district: data.district, province: data.province,
+    price: data.price, bedrooms: data.bedrooms, bathrooms: data.bathrooms,
+    sizeSqm: data.size_sqm, availableFrom: data.available_from,
+    minLeaseMonths: data.min_lease_months, depositMonths: data.deposit_months,
+    description: data.description || '',
+    amenities: data.amenities || [], rooms: data.rooms || [],
+    floorNo: data.floor_no || '', totalFloors: data.total_floors || '',
+    contactPhone: data.contact_phone || '', contactLine: data.contact_line || '',
+    photos: data.photos || [], status: data.status,
+  }
 }
 
 // ===================================================================
@@ -181,6 +271,22 @@ export async function getMemberProfile() {
   const p = await myProfile()
   if (!p) return null
   return { id: p.id, name: p.name, initial: p.initial, role: p.role, roleLabel: p.role_label, verified: p.verified, rating: p.rating }
+}
+
+// บันทึกข้อมูลโปรไฟล์ของตัวเอง
+export async function updateMyProfile({ name, phone }) {
+  if (!HAS_SUPABASE) { await delay(250); return { ok: true } }
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('ต้องเข้าสู่ระบบก่อน')
+  const patch = {}
+  if (name?.trim()) {
+    patch.name = name.trim()
+    patch.initial = name.trim().charAt(0).toUpperCase()
+  }
+  if (phone !== undefined) patch.phone = phone
+  const { error } = await supabase.from('profiles').update(patch).eq('user_id', user.id)
+  if (error) throw error
+  return { ok: true }
 }
 
 export async function getMemberStats() {

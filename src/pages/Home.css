@@ -103,3 +103,112 @@
 .ftr-links{display:flex;gap:18px}
 .ftr-links a{font-weight:600}
 .ftr-links a:hover{color:var(--brand)}
+
+/* ===================================================================
+   RESPONSIVE — แท็บเล็ต / มือถือ
+   =================================================================== */
+
+/* แล็ปท็อปเล็ก */
+@media (max-width: 1200px) {
+  .grid, .grid-3 { grid-template-columns: repeat(3, 1fr); gap: 22px 16px }
+}
+
+/* แท็บเล็ต — ซ่อนแถบซ้าย */
+@media (max-width: 1000px) {
+  .wrap { padding: 0 20px }
+  .home-body { grid-template-columns: 1fr; padding-top: 16px }
+  .upanel { display: none }
+  .grid, .grid-3 { grid-template-columns: repeat(2, 1fr) }
+  .hero-in { padding: 26px 24px }
+  .hero-in h1 { font-size: 26px }
+  .hero-in p { font-size: 14px }
+  .band-in { padding: 26px 24px }
+  .band-in h2 { font-size: 20px }
+  .band-in .btn-w { margin-left: 0 }
+}
+
+/* มือถือ */
+@media (max-width: 700px) {
+  .wrap { padding: 0 14px }
+  .rail-in { padding: 0 14px }
+  .ftype { font-size: 11.5px; padding: 8px 4px }
+  .ftype .ic { font-size: 19px }
+  .fbtn { padding: 9px 12px; font-size: 12.5px }
+
+  .grid, .grid-3 { grid-template-columns: 1fr; gap: 20px; padding: 10px 0 30px }
+
+  .hero-slim { padding: 0 0 16px }
+  .hero-box { border-radius: 18px }
+  .hero-in { padding: 22px 18px }
+  .hero-in h1 { font-size: 22px; line-height: 1.25 }
+  .hero-in p { font-size: 13.5px; margin-bottom: 16px }
+
+  /* ช่องค้นหาเรียงลงแนวตั้งบนมือถือ */
+  .searchcard { flex-direction: column; padding: 10px; gap: 4px; border-radius: 14px }
+  .sf { padding: 10px 12px; background: var(--soft) }
+  .sf + .sf { border-left: 0 }
+  .searchcard .sbtn { padding: 13px; justify-content: center; margin-top: 4px }
+
+  .band-in { padding: 22px 18px; border-radius: 18px }
+  .band-in h2 { font-size: 18px }
+  .band-in p { font-size: 13.5px }
+  .band-in .btn-w { width: 100%; text-align: center; padding: 12px }
+
+  .ftr { padding: 22px 14px 34px }
+  .ftr-in { flex-direction: column; align-items: flex-start; gap: 12px; font-size: 12.5px }
+  .ftr-links { flex-wrap: wrap; gap: 12px }
+
+  .empty { padding: 50px 14px }
+}
+
+/* ===================================================================
+   แผงตัวกรอง + ตัวกรองที่ใช้อยู่
+   =================================================================== */
+.fbtn.on{border-color:var(--brand);color:var(--brand);background:#fff5f5}
+
+.filterpanel{
+  border-bottom:1px solid var(--line);background:#fff;
+  box-shadow:0 6px 18px rgba(0,0,0,.05);
+}
+.fp-in{max-width:1280px;margin:0 auto;padding:20px 30px 22px}
+.fp-grp{margin-bottom:18px}
+.fp-grp > label{
+  display:block;font-size:12px;font-weight:800;color:var(--sub);
+  letter-spacing:.03em;margin-bottom:9px;text-transform:uppercase;
+}
+.fp-chips{display:flex;flex-wrap:wrap;gap:8px}
+.fp-chips button{
+  border:1px solid var(--line);border-radius:999px;padding:8px 14px;
+  font-size:13px;font-weight:600;background:#fff;transition:.15s;
+}
+.fp-chips button:hover{border-color:var(--ink)}
+.fp-chips button.on{background:var(--ink);border-color:var(--ink);color:#fff}
+.fp-act{
+  display:flex;gap:10px;justify-content:flex-end;align-items:center;
+  padding-top:16px;border-top:1px solid var(--line);
+}
+
+.activefilters{
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  padding:4px 0 14px;font-size:13px;
+}
+.af-n{font-weight:700;margin-right:4px}
+.af-tag{
+  display:inline-flex;align-items:center;gap:6px;background:var(--soft);
+  border-radius:999px;padding:5px 6px 5px 12px;font-size:12.5px;font-weight:600;
+}
+.af-tag button{
+  width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,.12);
+  font-size:10px;display:grid;place-items:center;transition:.15s;
+}
+.af-tag button:hover{background:var(--red);color:#fff}
+.af-clear{font-size:12.5px;font-weight:700;color:var(--brand);padding:5px 8px}
+.af-clear:hover{text-decoration:underline}
+
+@media (max-width: 700px) {
+  .fp-in{padding:16px 14px 18px}
+  .fp-chips button{font-size:12.5px;padding:8px 12px}
+  .fp-act{flex-direction:column-reverse}
+  .fp-act button{width:100%}
+  .activefilters{font-size:12.5px;padding-bottom:10px}
+}

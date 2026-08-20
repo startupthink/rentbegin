@@ -242,3 +242,49 @@
 .rvw{padding:14px 18px;border-bottom:1px solid var(--line)}
 .rvw:last-child{border-bottom:0}
 .stars{color:#f2a33c;letter-spacing:2px;font-size:13px}
+
+/* ---------- RESPONSIVE ---------- */
+@media (max-width: 1000px) {
+  .two-col { grid-template-columns: 1fr }
+  .kpis { grid-template-columns: repeat(2, 1fr) }
+}
+@media (max-width: 700px) {
+  .main { padding: 16px 14px 40px }
+  .phead { flex-direction: column; align-items: flex-start; gap: 12px }
+  .phead h2 { font-size: 20px }
+  .kpis { grid-template-columns: repeat(2, 1fr); gap: 10px }
+  .kpi-v { font-size: 21px }
+  .lrow { flex-wrap: wrap; gap: 10px; padding: 14px }
+  .lrow .th { width: 56px; height: 46px }
+  .lrow .num { margin-left: auto; text-align: right }
+  .lrow .act { width: 100%; justify-content: flex-start; flex-wrap: wrap }
+  .steps { flex-wrap: wrap; gap: 8px }
+  .step { flex: 1 1 45%; font-size: 12.5px; padding: 10px 8px }
+  .two-col { gap: 18px }
+  .g2c, .g3c { grid-template-columns: 1fr }
+  .tbl { font-size: 12.5px }
+  .tbl th, .tbl td { padding: 10px 8px }
+  .chatwrap { grid-template-columns: 1fr }
+  .threads { max-height: 210px; border-right: 0; border-bottom: 1px solid var(--line) }
+  .prev { display: none }
+  .photogrid { grid-template-columns: repeat(2, 1fr) }
+  .qrimg { width: 190px; height: 190px }
+  .rev { flex-direction: column; align-items: flex-start }
+  .rev-a { width: 100%; flex-direction: row }
+}
+
+/* ---------- ยืนยันลบ ---------- */
+.confirmbar{
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  background:#fdeaea;border-top:1px solid #f6cccc;
+  padding:13px 18px;font-size:13.5px;color:#8a2b2b;font-weight:600;
+}
+.cb-act{display:flex;gap:8px;margin-left:auto}
+.ib.danger:hover{border-color:var(--red);color:var(--red)}
+a.ib{text-decoration:none}
+.ib:disabled{opacity:.45;cursor:not-allowed}
+@media(max-width:700px){
+  .confirmbar{font-size:12.5px;padding:12px 14px}
+  .cb-act{margin-left:0;width:100%}
+  .cb-act button{flex:1}
+}

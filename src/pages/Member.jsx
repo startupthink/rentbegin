@@ -1,15 +1,17 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import Header from '../components/Header'
 import Sidebar from '../components/Sidebar'
 import PropertyCard from '../components/PropertyCard'
-import { PROPERTY_TYPES, AMENITIES } from '../data/constants'
+import { Link } from 'react-router-dom'
+import { PROPERTY_TYPES, AMENITIES, ROOM_FEATURES, LISTING_TYPES } from '../data/constants'
 import { photoStyle } from '../lib/photo'
 import {
   getMemberProfile, getMemberStats, getMemberTasks,
   getMemberListings, getMemberViewings, createListing,
   getMemberMessages, getMemberContracts, getMemberTransactions,
-  getMemberReceipts, getMemberReviews,
+  getMemberReceipts, getMemberReviews, updateMyProfile,
   uploadListingPhotos, deleteListingPhoto,
+  updateListing, deleteListing, setListingStatus, getListingForEdit,
   getMyBookings, respondBooking, payBooking,
   createContractFromBooking, getMyContracts, signContract,
 } from '../api/client'
@@ -48,24 +50,43 @@ export default function Member() {
   const [doneTasks, setDoneTasks] = useState([])
   const [bookingCount, setBookingCount] = useState(0)
 
-  useEffect(() => {
-    let alive = true
-    Promise.all([
+  // โหลดข้อมูลทั้งหมด — เรียกซ้ำได้หลังแก้ไข/ลบ
+  const reload = useCallback(async () => {
+    const [p, s, t, l, v, b] = await Promise.all([
       getMemberProfile(), getMemberStats(), getMemberTasks(),
       getMemberListings(), getMemberViewings(), getMyBookings(),
     ])
-      .then(([p, s, t, l, v, b]) => {
-        if (!alive) return
-        setProfile(p); setStats(s); setTasks(t); setListings(l); setViewings(v)
-        // นับเฉพาะรายการที่ต้องดำเนินการ (รอตอบรับ / รอชำระ)
-        setBookingCount((b || []).filter((x) => ['pending', 'accepted'].includes(x.status)).length)
-      })
-      .finally(() => { if (alive) setLoading(false) })
-    return () => { alive = false }
+    setProfile(p); setStats(s); setTasks(t); setListings(l); setViewings(v)
+    setBookingCount((b || []).filter((x) => ['pending', 'accepted'].includes(x.status)).length)
   }, [])
 
-  if (loading || !profile || !stats) {
-    return (<><Header /><div className="spin" /></>)
+  useEffect(() => {
+    let alive = true
+    reload()
+      .catch(() => {})
+      .finally(() => { if (alive) setLoading(false) })
+    return () => { alive = false }
+  }, [reload])
+
+  if (loading) return (<><Header /><div className="spin" /></>)
+
+  // โหลดโปรไฟล์ไม่ได้ (เช่น trigger ไม่ทำงาน) — แสดงทางแก้แทนหมุนค้าง
+  if (!profile || !stats) {
+    return (
+      <>
+        <Header />
+        <div className="empty" style={{ padding: '70px 20px', textAlign: 'center' }}>
+          <div className="empty-ic" style={{ fontSize: 44, opacity: .5 }}>⚠️</div>
+          <h3>โหลดข้อมูลบัญชีไม่สำเร็จ</h3>
+          <p style={{ color: 'var(--sub)', margin: '6px 0 18px' }}>
+            อาจเป็นเพราะการเชื่อมต่อขัดข้อง หรือบัญชียังไม่มีโปรไฟล์ในระบบ
+          </p>
+          <button className="btn-p" onClick={() => { setLoading(true); reload().finally(() => setLoading(false)) }}>
+            ลองใหม่อีกครั้ง
+          </button>
+        </div>
+      </>
+    )
   }
 
   return (
@@ -90,7 +111,7 @@ export default function Member() {
               goTab={setTab}
             />
           )}
-          {tab === 'listings' && <ListingsTab listings={listings} profile={profile} />}
+          {tab === 'listings' && <ListingsTab listings={listings} profile={profile} onChanged={reload} />}
           {tab === 'viewings' && <ViewingsTab initial={viewings} />}
           {tab === 'bookings' && <BookingsTab />}
           {tab === 'messages' && <MessagesTab />}
@@ -98,7 +119,7 @@ export default function Member() {
           {tab === 'revenue' && <RevenueTab stats={stats} />}
           {tab === 'receipts' && <ReceiptsTab />}
           {tab === 'reviews' && <ReviewsTab />}
-          {tab === 'settings' && <SettingsTab profile={profile} />}
+          {tab === 'settings' && <SettingsTab profile={profile} onChanged={reload} />}
         </main>
       </div>
     </>
@@ -112,7 +133,7 @@ function OverviewTab({ profile, stats, tasks, listings, viewings, doneTasks, set
     <>
       <div className="phead">
         <div>
-          <h2>สวัสดี {profile.name.split(' ')[0]} 👋</h2>
+          <h2>สวัสดี {(profile.name || 'คุณ').split(' ')[0]} 👋</h2>
           <p>
             {viewings.length > 0 ? `มีนัดชม ${viewings.length} รายการ` : 'ยังไม่มีนัดชม'}
             {visibleTasks.length > 0 ? ` · ${visibleTasks.length} รายการต้องทำ` : ''}
@@ -159,7 +180,7 @@ function OverviewTab({ profile, stats, tasks, listings, viewings, doneTasks, set
               <div className="lrow" key={l.id}>
                 <div className="th" style={photoStyle(l.photo)} />
                 <div className="info"><div className="info-t">{l.title}</div><div className="info-s">{l.sub}</div></div>
-                <div className="num"><div className="num-n">฿{l.price.toLocaleString()}</div><div className="num-l">{l.views ? `${l.views.toLocaleString()} วิว` : '—'}</div></div>
+                <div className="num"><div className="num-n">฿{Number(l.price || 0).toLocaleString()}</div><div className="num-l">{l.views ? `${l.views.toLocaleString()} วิว` : '—'}</div></div>
                 <div className="act"><span className={`tg ${STATUS[l.status].cls}`}>{STATUS[l.status].label}</span></div>
               </div>
             ))}
@@ -199,42 +220,46 @@ function OverviewTab({ profile, stats, tasks, listings, viewings, doneTasks, set
 }
 
 /* ==================== ประกาศของฉัน + ฟอร์มลงประกาศ ==================== */
-function ListingsTab({ listings, profile }) {
+function ListingsTab({ listings, profile, onChanged }) {
   const [step, setStep] = useState(1)
   const [saving, setSaving] = useState(false)
   const [savedMsg, setSavedMsg] = useState('')
-  const [form, setForm] = useState({
-    postAs: 'agent', type: 'condo', title: '', district: '',
+  const [editingId, setEditingId] = useState(null)   // null = สร้างใหม่
+  const [busyId, setBusyId] = useState(null)
+  const [confirmDel, setConfirmDel] = useState(null)
+  const [showForm, setShowForm] = useState(false)
+
+  const BLANK = {
+    type: 'condo', listingType: 'rent', title: '', district: '', province: 'กรุงเทพฯ',
     availableFrom: '', bedrooms: 1, bathrooms: 1, sizeSqm: 30,
-    price: 15000, amenities: ['aircon', 'furnished', 'bts', 'washer'],
-    depositMonths: 2, minLeaseMonths: 12, description: '',
-  })
+    price: 15000, salePrice: '', amenities: ['aircon', 'furnished'],
+    rooms: ['living', 'kitchen'], depositMonths: 2, minLeaseMonths: 12,
+    description: '', floorNo: '', totalFloors: '', contactPhone: '', contactLine: '',
+  }
+  const [form, setForm] = useState(BLANK)
   const [photos, setPhotos] = useState([])
   const [uploading, setUploading] = useState(false)
   const [upErr, setUpErr] = useState('')
 
-  function toggleAmenity(id) {
+  const isEditing = Boolean(editingId)
+
+  function toggleIn(field, id) {
     setForm((f) => ({
       ...f,
-      amenities: f.amenities.includes(id) ? f.amenities.filter((a) => a !== id) : [...f.amenities, id],
+      [field]: f[field].includes(id) ? f[field].filter((a) => a !== id) : [...f[field], id],
     }))
   }
 
-  // ---------- อัปโหลดรูปจริง ----------
+  // ---------- อัปโหลดรูป ----------
   async function handleFiles(fileList) {
     const files = Array.from(fileList || [])
     if (!files.length) return
-    if (photos.length + files.length > 10) {
-      setUpErr('อัปโหลดได้สูงสุด 10 รูป')
-      return
-    }
+    if (photos.length + files.length > 10) { setUpErr('อัปโหลดได้สูงสุด 10 รูป'); return }
     setUpErr(''); setUploading(true)
     try {
-      const urls = await uploadListingPhotos(files)
+      const urls = await uploadListingPhotos(files, editingId || 'draft')
       setPhotos((p) => [...p, ...urls])
-    } catch (e) {
-      setUpErr(e.message)
-    } finally { setUploading(false) }
+    } catch (e) { setUpErr(e.message) } finally { setUploading(false) }
   }
 
   function removePhoto(url) {
@@ -242,15 +267,71 @@ function ListingsTab({ listings, profile }) {
     deleteListingPhoto(url).catch(() => {})
   }
 
+  function movePhotoFirst(url) {
+    setPhotos((p) => [url, ...p.filter((x) => x !== url)])
+  }
+
+  // ---------- เปิดฟอร์มแก้ไข ----------
+  async function startEdit(id) {
+    setBusyId(id); setSavedMsg('')
+    try {
+      const d = await getListingForEdit(id)
+      if (!d) { setSavedMsg('✕ ไม่พบประกาศนี้'); return }
+      setForm({ ...BLANK, ...d })
+      setPhotos((d.photos || []).filter((p) => typeof p === 'string' && p.startsWith('http')))
+      setEditingId(id); setStep(1); setShowForm(true)
+      window.scrollTo({ top: 320, behavior: 'smooth' })
+    } catch (e) { setSavedMsg('✕ ' + e.message) } finally { setBusyId(null) }
+  }
+
+  function startNew() {
+    setForm(BLANK); setPhotos([]); setEditingId(null); setStep(1); setShowForm(true)
+    setSavedMsg('')
+  }
+
+  function cancelForm() {
+    setForm(BLANK); setPhotos([]); setEditingId(null); setStep(1); setShowForm(false)
+  }
+
+  // ---------- บันทึก ----------
   async function submitListing() {
+    if (!form.title.trim()) { setSavedMsg('✕ กรุณาใส่ชื่อประกาศ'); setStep(1); return }
+    if (!form.district.trim()) { setSavedMsg('✕ กรุณาใส่ทำเล'); setStep(1); return }
     setSaving(true); setSavedMsg('')
     try {
-      await createListing({ ...form, photos })
-      setSavedMsg('✓ ส่งประกาศเพื่อตรวจสอบแล้ว — แอดมินจะตรวจภายใน 24 ชม.')
-      setStep(1); setPhotos([])
+      if (isEditing) {
+        await updateListing(editingId, { ...form, photos })
+        setSavedMsg('✓ บันทึกการแก้ไขแล้ว')
+      } else {
+        await createListing({ ...form, photos })
+        setSavedMsg('✓ ส่งประกาศเพื่อตรวจสอบแล้ว — แอดมินจะตรวจภายใน 24 ชม.')
+      }
+      cancelForm()
+      onChanged?.()
     } catch (e) {
       setSavedMsg('✕ ' + e.message)
     } finally { setSaving(false) }
+  }
+
+  // ---------- ลบ / เปลี่ยนสถานะ ----------
+  async function doDelete(id) {
+    setBusyId(id)
+    try {
+      await deleteListing(id)
+      setSavedMsg('✓ ลบประกาศแล้ว')
+      setConfirmDel(null)
+      if (editingId === id) cancelForm()
+      onChanged?.()
+    } catch (e) { setSavedMsg('✕ ' + e.message) } finally { setBusyId(null) }
+  }
+
+  async function changeStatus(id, status) {
+    setBusyId(id)
+    try {
+      await setListingStatus(id, status)
+      setSavedMsg(status === 'rented' ? '✓ ทำเครื่องหมายว่าปล่อยเช่าแล้ว' : '✓ เปิดประกาศอีกครั้ง')
+      onChanged?.()
+    } catch (e) { setSavedMsg('✕ ' + e.message) } finally { setBusyId(null) }
   }
 
   const previewItem = {
@@ -260,167 +341,271 @@ function ListingsTab({ listings, profile }) {
     district: form.district || 'ทำเล',
     nearby: `โดย ${profile.name}`,
     price: Number(form.price) || 0,
+    salePrice: Number(form.salePrice) || 0,
+    listingType: form.listingType,
     bedrooms: Number(form.bedrooms), bathrooms: Number(form.bathrooms),
     sizeSqm: Number(form.sizeSqm), type: form.type,
     rating: 0, verified: profile.verified, hot: false,
     photos: photos.length ? photos : ['g1', 'g6', 'g3'],
   }
 
+  const forRent = form.listingType !== 'sale'
+  const forSale = form.listingType === 'sale' || form.listingType === 'both'
+
   return (
     <>
       <div className="phead">
-        <div><h2>ประกาศของฉัน</h2><p>{listings.length} รายการ · แก้ไข ปิด หรือเพิ่มประกาศใหม่ได้ที่นี่</p></div>
+        <div><h2>ประกาศของฉัน</h2><p>{listings.length} รายการ · แก้ไข ปิด หรือลบได้ที่นี่</p></div>
+        <button className="btn-p" onClick={startNew}>+ ลงประกาศใหม่</button>
       </div>
 
+      {savedMsg && <div className={`flash ${savedMsg.startsWith('✕') ? 'err' : ''}`}>{savedMsg}</div>}
+
       <div className="pn" style={{ marginBottom: 28 }}>
-        {listings.map((l) => (
-          <div className="lrow" key={l.id}>
-            <div className="th" style={photoStyle(l.photo)} />
-            <div className="info"><div className="info-t">{l.title}</div><div className="info-s">{l.sub}</div></div>
-            <div className="num"><div className="num-n">฿{l.price.toLocaleString()}</div><div className="num-l">{l.views ? `${l.views.toLocaleString()} วิว` : '—'}</div></div>
-            <div className="act">
-              <span className={`tg ${STATUS[l.status].cls}`}>{STATUS[l.status].label}</span>
-              <button className="ib" title="แก้ไข">✏️</button>
-              <button className="ib" title="ดูหน้าประกาศ">👁️</button>
+        {listings.length === 0 ? (
+          <div className="done-all">ยังไม่มีประกาศ — กด &ldquo;ลงประกาศใหม่&rdquo; เพื่อเริ่ม</div>
+        ) : listings.map((l) => (
+          <div key={l.id}>
+            <div className="lrow">
+              <div className="th" style={photoStyle(l.photo)} />
+              <div className="info">
+                <div className="info-t">{l.title}</div>
+                <div className="info-s">{l.sub}</div>
+              </div>
+              <div className="num">
+                <div className="num-n">฿{Number(l.price || 0).toLocaleString()}</div>
+                <div className="num-l">{l.views ? `${l.views.toLocaleString()} วิว` : '—'}</div>
+              </div>
+              <div className="act">
+                <span className={`tg ${(STATUS[l.status] || STATUS.pending).cls}`}>
+                  {(STATUS[l.status] || STATUS.pending).label}
+                </span>
+                <button className="ib" title="แก้ไข" disabled={busyId === l.id}
+                  onClick={() => startEdit(l.id)}>✏️</button>
+                <Link className="ib" title="ดูหน้าประกาศ" to={`/property/${l.id}`}>👁️</Link>
+                {l.status === 'live' ? (
+                  <button className="ib" title="ทำเครื่องหมายว่าปล่อยเช่าแล้ว" disabled={busyId === l.id}
+                    onClick={() => changeStatus(l.id, 'rented')}>✅</button>
+                ) : l.status === 'rented' ? (
+                  <button className="ib" title="เปิดประกาศอีกครั้ง" disabled={busyId === l.id}
+                    onClick={() => changeStatus(l.id, 'live')}>↩︎</button>
+                ) : null}
+                <button className="ib danger" title="ลบประกาศ" disabled={busyId === l.id}
+                  onClick={() => setConfirmDel(l.id)}>🗑️</button>
+              </div>
             </div>
+
+            {confirmDel === l.id && (
+              <div className="confirmbar">
+                <span>ลบ &ldquo;{l.title}&rdquo; ถาวร? รูปทั้งหมดจะถูกลบด้วย และกู้คืนไม่ได้</span>
+                <div className="cb-act">
+                  <button className="btn-o btn-s" onClick={() => setConfirmDel(null)}>ยกเลิก</button>
+                  <button className="btn-no" disabled={busyId === l.id} onClick={() => doDelete(l.id)}>
+                    {busyId === l.id ? 'กำลังลบ...' : 'ยืนยันลบ'}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         ))}
       </div>
 
-      <div className="phead"><div><h2>ลงประกาศใหม่</h2><p>กรอก 3 ขั้นตอน เสร็จใน 3 นาที</p></div></div>
-      {savedMsg && <div className="flash">{savedMsg}</div>}
+      {!showForm ? null : (
+        <>
+          <div className="phead">
+            <div>
+              <h2>{isEditing ? 'แก้ไขประกาศ' : 'ลงประกาศใหม่'}</h2>
+              <p>{isEditing ? `กำลังแก้ไข #${editingId}` : 'กรอก 3 ขั้นตอน เสร็จใน 3 นาที'}</p>
+            </div>
+            <button className="btn-o" onClick={cancelForm}>ยกเลิก</button>
+          </div>
 
-      <div className="steps">
-        {['ข้อมูลทรัพย์', 'รูปภาพ', 'ราคา & เงื่อนไข'].map((s, i) => (
-          <button key={s} className={`step ${step === i + 1 ? 'on' : ''}`} onClick={() => setStep(i + 1)}>
-            <span className="step-n">{i + 1}</span> {s}
-          </button>
-        ))}
-      </div>
+          <div className="steps">
+            {['ข้อมูลทรัพย์', 'รูปภาพ', 'ราคา & เงื่อนไข'].map((s, i) => (
+              <button key={s} className={`step ${step === i + 1 ? 'on' : ''}`} onClick={() => setStep(i + 1)}>
+                <span className="step-n">{i + 1}</span> {s}
+              </button>
+            ))}
+          </div>
 
-      <div className="two-col">
-        <div className="pn pn-form">
-          {step === 1 && (
-            <>
-              <div className="fr"><label>ลงในฐานะ</label>
-                <div className="chips">
-                  <button className={`chip ${form.postAs === 'owner' ? 'on' : ''}`} onClick={() => setForm({ ...form, postAs: 'owner' })}>🙋 เจ้าของเอง</button>
-                  <button className={`chip ${form.postAs === 'agent' ? 'on' : ''}`} onClick={() => setForm({ ...form, postAs: 'agent' })}>💼 นายหน้า</button>
-                </div>
-              </div>
-              <div className="fr"><label>ประเภททรัพย์</label>
-                <div className="chips">
-                  {PROPERTY_TYPES.filter((t) => t.id !== 'all').map((t) => (
-                    <button key={t.id} className={`chip ${form.type === t.id ? 'on' : ''}`} onClick={() => setForm({ ...form, type: t.id })}>{t.icon} {t.label}</button>
-                  ))}
-                </div>
-              </div>
-              <div className="fr"><label htmlFor="ftitle">ชื่อประกาศ</label>
-                <input id="ftitle" placeholder="เช่น The Base รัชดา 1 ห้องนอน ชั้น 22 วิวเมือง"
-                  value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
-              </div>
-              <div className="g2c">
-                <div className="fr"><label htmlFor="fdist">ทำเล / เขต</label>
-                  <input id="fdist" placeholder="เช่น ห้วยขวาง กรุงเทพฯ" value={form.district} onChange={(e) => setForm({ ...form, district: e.target.value })} /></div>
-                <div className="fr"><label htmlFor="favail">เข้าอยู่ได้</label>
-                  <input id="favail" placeholder="เช่น 1 ก.ค. 2568" value={form.availableFrom} onChange={(e) => setForm({ ...form, availableFrom: e.target.value })} /></div>
-              </div>
-              <div className="g3c">
-                <div className="fr"><label htmlFor="fbed">ห้องนอน</label>
-                  <input id="fbed" type="number" min="0" value={form.bedrooms} onChange={(e) => setForm({ ...form, bedrooms: e.target.value })} /></div>
-                <div className="fr"><label htmlFor="fbath">ห้องน้ำ</label>
-                  <input id="fbath" type="number" min="0" value={form.bathrooms} onChange={(e) => setForm({ ...form, bathrooms: e.target.value })} /></div>
-                <div className="fr"><label htmlFor="fsize">ตร.ม.</label>
-                  <input id="fsize" type="number" min="0" value={form.sizeSqm} onChange={(e) => setForm({ ...form, sizeSqm: e.target.value })} /></div>
-              </div>
-              <div className="fr"><label>จุดเด่น</label>
-                <div className="chips">
-                  {AMENITIES.map((a) => (
-                    <button key={a.id} className={`chip ${form.amenities.includes(a.id) ? 'on' : ''}`} onClick={() => toggleAmenity(a.id)}>{a.icon} {a.label}</button>
-                  ))}
-                </div>
-              </div>
-              <button className="btn-p full big-btn" onClick={() => setStep(2)}>ถัดไป →</button>
-            </>
-          )}
-
-          {step === 2 && (
-            <>
-              <div className="fr">
-                <label>รูปภาพ ({photos.length}/10)</label>
-                <label className={`drop ${uploading ? 'busy' : ''}`}>
-                  <input
-                    type="file" accept="image/*" multiple hidden
-                    disabled={uploading}
-                    onChange={(e) => { handleFiles(e.target.files); e.target.value = '' }}
-                  />
-                  {uploading ? (
-                    <>⏳ กำลังอัปโหลด...</>
-                  ) : (
-                    <>📷 กดเพื่อ <b>เลือกไฟล์รูป</b><br />
-                      <span className="drop-sub">รูปแรกจะเป็นรูปปก · แนะนำอย่างน้อย 5 รูป · ไม่เกิน 5 MB ต่อรูป</span></>
-                  )}
-                </label>
-              </div>
-
-              {upErr && <div className="flash err">{upErr}</div>}
-
-              {photos.length > 0 && (
-                <div className="fr">
-                  <label>รูปที่อัปโหลดแล้ว</label>
-                  <div className="photogrid">
-                    {photos.map((url, i) => (
-                      <div className="photoitem" key={url} style={photoStyle(url)}>
-                        {i === 0 && <span className="photocover">ปก</span>}
-                        <button className="photodel" onClick={() => removePhoto(url)} title="ลบรูปนี้">✕</button>
-                      </div>
-                    ))}
+          <div className="two-col">
+            <div className="pn pn-form">
+              {step === 1 && (
+                <>
+                  <div className="fr"><label>ประกาศนี้ต้องการ</label>
+                    <div className="chips">
+                      {LISTING_TYPES.map((t) => (
+                        <button key={t.id} className={`chip ${form.listingType === t.id ? 'on' : ''}`}
+                          onClick={() => setForm({ ...form, listingType: t.id })}>{t.icon} {t.label}</button>
+                      ))}
+                    </div>
                   </div>
-                </div>
+
+                  <div className="fr"><label>ประเภททรัพย์</label>
+                    <div className="chips">
+                      {PROPERTY_TYPES.filter((t) => t.id !== 'all').map((t) => (
+                        <button key={t.id} className={`chip ${form.type === t.id ? 'on' : ''}`}
+                          onClick={() => setForm({ ...form, type: t.id })}>{t.icon} {t.label}</button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="fr"><label htmlFor="ftitle">ชื่อประกาศ *</label>
+                    <input id="ftitle" placeholder="เช่น The Base รัชดา 1 ห้องนอน ชั้น 22 วิวเมือง"
+                      value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+                  </div>
+
+                  <div className="g2c">
+                    <div className="fr"><label htmlFor="fdist">ทำเล / เขต *</label>
+                      <input id="fdist" placeholder="เช่น ห้วยขวาง" value={form.district}
+                        onChange={(e) => setForm({ ...form, district: e.target.value })} /></div>
+                    <div className="fr"><label htmlFor="fprov">จังหวัด</label>
+                      <input id="fprov" placeholder="เช่น กรุงเทพฯ" value={form.province}
+                        onChange={(e) => setForm({ ...form, province: e.target.value })} /></div>
+                  </div>
+
+                  <div className="g2c">
+                    <div className="fr"><label htmlFor="favail">{forRent ? 'เข้าอยู่ได้' : 'พร้อมโอน'}</label>
+                      <input id="favail" placeholder="เช่น 1 ก.ย. 2569" value={form.availableFrom}
+                        onChange={(e) => setForm({ ...form, availableFrom: e.target.value })} /></div>
+                    <div className="fr"><label htmlFor="ffloor">ชั้นที่ (ถ้ามี)</label>
+                      <input id="ffloor" placeholder="เช่น 22" value={form.floorNo}
+                        onChange={(e) => setForm({ ...form, floorNo: e.target.value })} /></div>
+                  </div>
+
+                  <div className="g3c">
+                    <div className="fr"><label htmlFor="fbed">ห้องนอน</label>
+                      <input id="fbed" type="number" min="0" value={form.bedrooms}
+                        onChange={(e) => setForm({ ...form, bedrooms: e.target.value })} /></div>
+                    <div className="fr"><label htmlFor="fbath">ห้องน้ำ</label>
+                      <input id="fbath" type="number" min="0" value={form.bathrooms}
+                        onChange={(e) => setForm({ ...form, bathrooms: e.target.value })} /></div>
+                    <div className="fr"><label htmlFor="fsize">ตร.ม.</label>
+                      <input id="fsize" type="number" min="0" value={form.sizeSqm}
+                        onChange={(e) => setForm({ ...form, sizeSqm: e.target.value })} /></div>
+                  </div>
+
+                  <div className="fr"><label>ห้องและพื้นที่ใช้สอย</label>
+                    <div className="chips">
+                      {ROOM_FEATURES.map((r) => (
+                        <button key={r.id} className={`chip ${form.rooms.includes(r.id) ? 'on' : ''}`}
+                          onClick={() => toggleIn('rooms', r.id)}>{r.icon} {r.label}</button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="fr"><label>จุดเด่น / สิ่งอำนวยความสะดวก</label>
+                    <div className="chips">
+                      {AMENITIES.map((a) => (
+                        <button key={a.id} className={`chip ${form.amenities.includes(a.id) ? 'on' : ''}`}
+                          onClick={() => toggleIn('amenities', a.id)}>{a.icon} {a.label}</button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <button className="btn-p full big-btn" onClick={() => setStep(2)}>ถัดไป →</button>
+                </>
               )}
 
-              <div className="btn-pair">
-                <button className="btn-o full" onClick={() => setStep(1)}>← ย้อนกลับ</button>
-                <button className="btn-p full big-btn" onClick={() => setStep(3)}>ถัดไป →</button>
-              </div>
-            </>
-          )}
+              {step === 2 && (
+                <>
+                  <div className="fr">
+                    <label>รูปภาพ ({photos.length}/10)</label>
+                    <label className={`drop ${uploading ? 'busy' : ''}`}>
+                      <input type="file" accept="image/*" multiple hidden disabled={uploading}
+                        onChange={(e) => { handleFiles(e.target.files); e.target.value = '' }} />
+                      {uploading ? (<>⏳ กำลังอัปโหลด...</>) : (
+                        <>📷 กดเพื่อ <b>เลือกไฟล์รูป</b><br />
+                          <span className="drop-sub">รูปแรกเป็นรูปปก · แนะนำอย่างน้อย 5 รูป · ไม่เกิน 5 MB ต่อรูป</span></>
+                      )}
+                    </label>
+                  </div>
 
-          {step === 3 && (
-            <>
-              <div className="g2c">
-                <div className="fr"><label htmlFor="fprice">ค่าเช่า / เดือน (฿)</label>
-                  <input id="fprice" type="number" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} /></div>
-                <div className="fr"><label htmlFor="fdep">มัดจำ (เดือน)</label>
-                  <select id="fdep" value={form.depositMonths}
-                    onChange={(e) => setForm({ ...form, depositMonths: e.target.value })}>
-                    <option value="1">1 เดือน</option><option value="2">2 เดือน</option><option value="3">3 เดือน</option>
-                  </select></div>
-              </div>
-              <div className="fr"><label htmlFor="flease">สัญญาขั้นต่ำ</label>
-                <select id="flease" value={form.minLeaseMonths}
-                  onChange={(e) => setForm({ ...form, minLeaseMonths: e.target.value })}>
-                  <option value="6">6 เดือน</option><option value="12">12 เดือน</option><option value="24">24 เดือน</option>
-                </select></div>
-              <div className="fr"><label htmlFor="fdesc">รายละเอียด</label>
-                <textarea id="fdesc" rows="4" value={form.description}
-                  onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  placeholder="บอกจุดเด่นของทรัพย์ ทำเล การเดินทาง สิ่งอำนวยความสะดวก..." /></div>
-              <div className="btn-pair">
-                <button className="btn-o full" onClick={() => setStep(2)}>← ย้อนกลับ</button>
-                <button className="btn-p full big-btn" onClick={submitListing} disabled={saving}>
-                  {saving ? 'กำลังส่ง...' : 'ส่งประกาศเพื่อตรวจสอบ'}
-                </button>
-              </div>
-            </>
-          )}
-        </div>
+                  {upErr && <div className="flash err">{upErr}</div>}
 
-        <div className="prev">
-          <div className="prev-l">ตัวอย่างที่คนเช่าจะเห็น</div>
-          <div className="prev-body"><PropertyCard item={previewItem} preview /></div>
-        </div>
-      </div>
+                  {photos.length > 0 && (
+                    <div className="fr">
+                      <label>รูปที่อัปโหลดแล้ว — กดรูปเพื่อตั้งเป็นปก</label>
+                      <div className="photogrid">
+                        {photos.map((url, i) => (
+                          <div className="photoitem" key={url} style={photoStyle(url)}
+                            onClick={() => movePhotoFirst(url)} title="ตั้งเป็นรูปปก">
+                            {i === 0 && <span className="photocover">ปก</span>}
+                            <button className="photodel"
+                              onClick={(e) => { e.stopPropagation(); removePhoto(url) }} title="ลบรูปนี้">✕</button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="btn-pair">
+                    <button className="btn-o full" onClick={() => setStep(1)}>← ย้อนกลับ</button>
+                    <button className="btn-p full big-btn" onClick={() => setStep(3)}>ถัดไป →</button>
+                  </div>
+                </>
+              )}
+
+              {step === 3 && (
+                <>
+                  {forRent && (
+                    <div className="g2c">
+                      <div className="fr"><label htmlFor="fprice">ค่าเช่า / เดือน (฿)</label>
+                        <input id="fprice" type="number" min="0" value={form.price}
+                          onChange={(e) => setForm({ ...form, price: e.target.value })} /></div>
+                      <div className="fr"><label htmlFor="fdep">มัดจำ (เดือน)</label>
+                        <select id="fdep" value={form.depositMonths}
+                          onChange={(e) => setForm({ ...form, depositMonths: e.target.value })}>
+                          <option value="1">1 เดือน</option><option value="2">2 เดือน</option><option value="3">3 เดือน</option>
+                        </select></div>
+                    </div>
+                  )}
+
+                  {forSale && (
+                    <div className="fr"><label htmlFor="fsale">ราคาขาย (฿)</label>
+                      <input id="fsale" type="number" min="0" placeholder="เช่น 2500000" value={form.salePrice}
+                        onChange={(e) => setForm({ ...form, salePrice: e.target.value })} /></div>
+                  )}
+
+                  {forRent && (
+                    <div className="fr"><label htmlFor="flease">สัญญาขั้นต่ำ</label>
+                      <select id="flease" value={form.minLeaseMonths}
+                        onChange={(e) => setForm({ ...form, minLeaseMonths: e.target.value })}>
+                        <option value="6">6 เดือน</option><option value="12">12 เดือน</option><option value="24">24 เดือน</option>
+                      </select></div>
+                  )}
+
+                  <div className="g2c">
+                    <div className="fr"><label htmlFor="fphone">เบอร์ติดต่อ</label>
+                      <input id="fphone" placeholder="08x-xxx-xxxx" value={form.contactPhone}
+                        onChange={(e) => setForm({ ...form, contactPhone: e.target.value })} /></div>
+                    <div className="fr"><label htmlFor="fline">LINE ID</label>
+                      <input id="fline" placeholder="@yourline" value={form.contactLine}
+                        onChange={(e) => setForm({ ...form, contactLine: e.target.value })} /></div>
+                  </div>
+
+                  <div className="fr"><label htmlFor="fdesc">รายละเอียด</label>
+                    <textarea id="fdesc" rows="5" value={form.description}
+                      onChange={(e) => setForm({ ...form, description: e.target.value })}
+                      placeholder="บอกจุดเด่นของทรัพย์ ทำเล การเดินทาง สิ่งอำนวยความสะดวก..." /></div>
+
+                  <div className="btn-pair">
+                    <button className="btn-o full" onClick={() => setStep(2)}>← ย้อนกลับ</button>
+                    <button className="btn-p full big-btn" onClick={submitListing} disabled={saving}>
+                      {saving ? 'กำลังบันทึก...' : isEditing ? '💾 บันทึกการแก้ไข' : 'ส่งประกาศเพื่อตรวจสอบ'}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="prev">
+              <div className="prev-l">ตัวอย่างที่ผู้ค้นหาจะเห็น</div>
+              <div className="prev-body"><PropertyCard item={previewItem} preview /></div>
+            </div>
+          </div>
+        </>
+      )}
     </>
   )
 }
@@ -790,15 +975,49 @@ function RevenueTab({ stats }) {
 function ReceiptsTab() {
   const [rows, setRows] = useState([])
   useEffect(() => { let a = true; getMemberReceipts().then((d) => a && setRows(d || [])); return () => { a = false } }, [])
+
+  // เปิดหน้าต่างพิมพ์ — ผู้ใช้เลือก "บันทึกเป็น PDF" ได้จากเมนูพิมพ์
+  function printReceipt(r) {
+    const w = window.open('', '_blank', 'width=720,height=900')
+    if (!w) { alert('เบราว์เซอร์บล็อกป๊อปอัป — กรุณาอนุญาตแล้วลองใหม่'); return }
+    w.document.write(`<!DOCTYPE html><html lang="th"><head><meta charset="utf-8">
+      <title>ใบเสร็จ ${r.id}</title>
+      <style>
+        body{font-family:-apple-system,'Noto Sans Thai',sans-serif;padding:44px;color:#1c1c1e;line-height:1.7}
+        h1{font-size:22px;margin:0 0 4px}
+        .sub{color:#6e7377;font-size:13px;margin-bottom:28px}
+        .box{border:1px solid #e8e6e1;border-radius:14px;padding:24px}
+        .row{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid #f1f0ee;font-size:14px}
+        .row:last-child{border-bottom:0}
+        .total{font-size:19px;font-weight:800;padding-top:14px;margin-top:8px;border-top:2px solid #1c1c1e}
+        .ft{margin-top:26px;font-size:12px;color:#6e7377}
+      </style></head><body>
+      <h1>ใบเสร็จรับเงิน</h1>
+      <div class="sub">Rentbegin.com · เลขที่ ${r.id}</div>
+      <div class="box">
+        <div class="row"><span>วันที่</span><b>${r.date}</b></div>
+        <div class="row"><span>รายการ</span><b>${r.desc}</b></div>
+        <div class="row"><span>เลขที่ใบเสร็จ</span><b>${r.id}</b></div>
+        <div class="row total"><span>จำนวนเงิน</span><span>฿${Number(r.amount).toLocaleString()}</span></div>
+      </div>
+      <div class="ft">เอกสารนี้ออกโดยระบบอัตโนมัติของ Rentbegin.com<br/>พิมพ์เมื่อ ${new Date().toLocaleString('th-TH')}</div>
+      </body></html>`)
+    w.document.close()
+    w.focus()
+    setTimeout(() => w.print(), 300)
+  }
+
   return (
     <>
-      <div className="phead"><div><h2>ใบเสร็จ</h2><p>ดาวน์โหลดใบเสร็จค่าเช่าที่ออกผ่านระบบ</p></div></div>
+      <div className="phead"><div><h2>ใบเสร็จ</h2><p>{rows.length} ใบ · กดเพื่อพิมพ์หรือบันทึกเป็น PDF</p></div></div>
       <div className="pn">
-        {rows.map((r) => (
+        {rows.length === 0 ? <div className="done-all">ยังไม่มีใบเสร็จ</div> : rows.map((r) => (
           <div className="lrow" key={r.id}>
             <div className="info"><div className="info-t">{r.desc}</div><div className="info-s">{r.id} · {r.date}</div></div>
             <div className="num"><div className="num-n">฿{r.amount.toLocaleString()}</div></div>
-            <div className="act"><button className="btn-o btn-s">⬇ ดาวน์โหลด PDF</button></div>
+            <div className="act">
+              <button className="btn-o btn-s" onClick={() => printReceipt(r)}>⬇ บันทึก PDF</button>
+            </div>
           </div>
         ))}
       </div>
@@ -831,27 +1050,55 @@ function ReviewsTab() {
 }
 
 /* ==================== ตั้งค่า ==================== */
-function SettingsTab({ profile }) {
-  const [saved, setSaved] = useState(false)
+function SettingsTab({ profile, onChanged }) {
+  const [name, setName] = useState(profile.name || '')
+  const [phone, setPhone] = useState(profile.phone || '')
+  const [notif, setNotif] = useState(['msg', 'viewing'])
+  const [saving, setSaving] = useState(false)
+  const [msg, setMsg] = useState('')
+
+  const NOTIF = [
+    { id: 'msg', label: '💬 ข้อความใหม่' },
+    { id: 'viewing', label: '📅 นัดชม' },
+    { id: 'weekly', label: '📈 สรุปรายสัปดาห์' },
+  ]
+
+  async function save() {
+    if (!name.trim()) { setMsg('✕ กรุณาใส่ชื่อที่แสดง'); return }
+    setSaving(true); setMsg('')
+    try {
+      await updateMyProfile({ name, phone })
+      setMsg('✓ บันทึกการตั้งค่าแล้ว')
+      onChanged?.()
+      setTimeout(() => setMsg(''), 3000)
+    } catch (e) { setMsg('✕ ' + e.message) } finally { setSaving(false) }
+  }
+
   return (
     <>
       <div className="phead"><div><h2>ตั้งค่าบัญชี</h2><p>ข้อมูลที่แสดงบนประกาศของคุณ</p></div></div>
-      {saved && <div className="flash">✓ บันทึกการตั้งค่าแล้ว</div>}
+      {msg && <div className={`flash ${msg.startsWith('✕') ? 'err' : ''}`}>{msg}</div>}
       <div className="pn pn-form" style={{ maxWidth: 560 }}>
-        <div className="fr"><label>ชื่อที่แสดง</label><input defaultValue={profile.name} /></div>
-        <div className="g2c">
-          <div className="fr"><label>เบอร์ติดต่อ</label><input defaultValue="08x-xxx-xxxx" /></div>
-          <div className="fr"><label>LINE ID</label><input defaultValue="@weeraprop" /></div>
-        </div>
-        <div className="fr"><label>เขตพื้นที่ให้บริการ</label><input defaultValue="นนทบุรี · กรุงเทพฯ ฝั่งเหนือ" /></div>
+        <div className="fr"><label htmlFor="sname">ชื่อที่แสดง</label>
+          <input id="sname" value={name} onChange={(e) => setName(e.target.value)} /></div>
+        <div className="fr"><label htmlFor="sphone">เบอร์ติดต่อ</label>
+          <input id="sphone" placeholder="08x-xxx-xxxx" value={phone}
+            onChange={(e) => setPhone(e.target.value)} /></div>
+        <div className="fr"><label>บทบาท</label>
+          <input value={profile.roleLabel || '-'} disabled /></div>
         <div className="fr"><label>แจ้งเตือน</label>
           <div className="chips">
-            <button className="chip on">💬 ข้อความใหม่</button>
-            <button className="chip on">📅 นัดชม</button>
-            <button className="chip">📈 สรุปรายสัปดาห์</button>
+            {NOTIF.map((n) => (
+              <button key={n.id} className={`chip ${notif.includes(n.id) ? 'on' : ''}`}
+                onClick={() => setNotif((v) => v.includes(n.id) ? v.filter((x) => x !== n.id) : [...v, n.id])}>
+                {n.label}
+              </button>
+            ))}
           </div>
         </div>
-        <button className="btn-p" onClick={() => { setSaved(true); setTimeout(() => setSaved(false), 3000) }}>บันทึก</button>
+        <button className="btn-p" onClick={save} disabled={saving}>
+          {saving ? 'กำลังบันทึก...' : 'บันทึก'}
+        </button>
       </div>
     </>
   )

@@ -1,6 +1,8 @@
+import { useState, useRef, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useSaved } from '../context/SavedContext'
 import { useAuth } from '../context/AuthContext'
+import { PROPERTY_TYPES, BUDGET_RANGES } from '../data/constants'
 import './Header.css'
 
 export default function Header({ search }) {
@@ -8,16 +10,45 @@ export default function Header({ search }) {
   const { isAuthed, isAdmin, profile, signOut, mode, setMode } = useAuth()
   const nav = useNavigate()
 
+  const [open, setOpen] = useState(false)          // แผงค้นหาบน header
+  const [menuOpen, setMenuOpen] = useState(false)  // เมนูบัญชี
+  const [f, setF] = useState({ place: '', type: 'all', budget: 'any' })
+  const boxRef = useRef(null)
+  const menuRef = useRef(null)
+
+  // คลิกนอกพื้นที่ → ปิด
+  useEffect(() => {
+    function onDoc(e) {
+      if (boxRef.current && !boxRef.current.contains(e.target)) setOpen(false)
+      if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false)
+    }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [])
+
   async function handleSignOut() {
+    setMenuOpen(false)
     await signOut()
     nav('/')
   }
 
   function switchMode(m) {
     setMode(m)
-    if (m === 'list') nav('/member')
-    else nav('/')
+    nav(m === 'list' ? '/member' : '/')
   }
+
+  function submitSearch(e) {
+    e?.preventDefault()
+    const p = new URLSearchParams()
+    if (f.place.trim()) p.set('q', f.place.trim())
+    if (f.type !== 'all') p.set('type', f.type)
+    if (f.budget !== 'any') p.set('budget', f.budget)
+    setOpen(false)
+    nav(`/?${p.toString()}`)
+  }
+
+  const budgetLabel = BUDGET_RANGES.find((b) => b.id === f.budget)?.label
+  const typeLabel = PROPERTY_TYPES.find((t) => t.id === f.type)?.label
 
   return (
     <header className="hdr">
@@ -29,11 +60,41 @@ export default function Header({ search }) {
           rentbegin
         </Link>
 
-        <div className="psearch">
-          <span className="seg2">{search?.place || 'ทุกทำเล'}</span>
-          <span className="seg2 dim">{search?.type || 'ทุกประเภท'}</span>
-          <span className="seg2 dim">{search?.budget || 'งบเท่าไหร่'}</span>
-          <span className="go">🔍</span>
+        {/* ---------- ช่องค้นหา (กดได้จริง) ---------- */}
+        <div className="psearch-wrap" ref={boxRef}>
+          <button className="psearch" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
+            <span className="seg2">{search?.place || (f.place || 'ทุกทำเล')}</span>
+            <span className="seg2 dim">{search?.type || (f.type !== 'all' ? typeLabel : 'ทุกประเภท')}</span>
+            <span className="seg2 dim">{search?.budget || (f.budget !== 'any' ? budgetLabel : 'งบเท่าไหร่')}</span>
+            <span className="go">🔍</span>
+          </button>
+
+          {open && (
+            <form className="psearch-pop" onSubmit={submitSearch}>
+              <div className="pp-f">
+                <label htmlFor="hplace">ทำเล</label>
+                <input
+                  id="hplace" autoFocus
+                  placeholder="เช่น รัชดา, ห้วยขวาง, นนทบุรี"
+                  value={f.place}
+                  onChange={(e) => setF({ ...f, place: e.target.value })}
+                />
+              </div>
+              <div className="pp-f">
+                <label htmlFor="htype">ประเภท</label>
+                <select id="htype" value={f.type} onChange={(e) => setF({ ...f, type: e.target.value })}>
+                  {PROPERTY_TYPES.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+                </select>
+              </div>
+              <div className="pp-f">
+                <label htmlFor="hbudget">งบต่อเดือน</label>
+                <select id="hbudget" value={f.budget} onChange={(e) => setF({ ...f, budget: e.target.value })}>
+                  {BUDGET_RANGES.map((b) => <option key={b.id} value={b.id}>{b.label}</option>)}
+                </select>
+              </div>
+              <button type="submit" className="btn-p pp-go">🔍 ค้นหา</button>
+            </form>
+          )}
         </div>
 
         <div className="hdr-right">
@@ -49,20 +110,34 @@ export default function Header({ search }) {
                   <button
                     className={`modesw-b ${mode === 'rent' ? 'on' : ''}`}
                     onClick={() => switchMode('rent')}
-                    title="โหมดหาเช่า"
                   >🔑 หาเช่า</button>
                   <button
                     className={`modesw-b ${mode === 'list' ? 'on' : ''}`}
                     onClick={() => switchMode('list')}
-                    title="โหมดปล่อยเช่า"
                   >🏠 ปล่อยเช่า</button>
                 </div>
               )}
-              {isAdmin && <Link to="/admin" className="lnk">แผงแอดมิน</Link>}
-              <Link to={isAdmin ? '/admin' : '/member'} className="acct" title={profile?.name}>
-                <span className="av">{profile?.initial || 'ผ'}</span>
-              </Link>
-              <button className="lnk" onClick={handleSignOut}>ออกจากระบบ</button>
+
+              {/* ---------- เมนูบัญชี ---------- */}
+              <div className="acct-wrap" ref={menuRef}>
+                <button className="acct" onClick={() => setMenuOpen((v) => !v)} title={profile?.name}>
+                  <span className="bars">☰</span>
+                  <span className="av">{profile?.initial || 'ผ'}</span>
+                </button>
+                {menuOpen && (
+                  <div className="acct-menu">
+                    <div className="am-head">
+                      <b>{profile?.name || 'สมาชิก'}</b>
+                      <span>{profile?.roleLabel}</span>
+                    </div>
+                    <Link to="/member" onClick={() => setMenuOpen(false)}>📋 แดชบอร์ดของฉัน</Link>
+                    <Link to="/saved" onClick={() => setMenuOpen(false)}>♥ ที่บันทึกไว้</Link>
+                    {isAdmin && <Link to="/admin" onClick={() => setMenuOpen(false)}>🛡️ แผงแอดมิน</Link>}
+                    <Link to="/privacy" onClick={() => setMenuOpen(false)}>📄 นโยบายความเป็นส่วนตัว</Link>
+                    <button onClick={handleSignOut}>↩︎ ออกจากระบบ</button>
+                  </div>
+                )}
+              </div>
             </>
           ) : (
             <>

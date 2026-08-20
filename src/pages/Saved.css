@@ -12,3 +12,10 @@
 .saved-empty h3{margin:0 0 8px;font-size:20px;font-weight:800}
 .saved-empty p{margin:0 0 22px;color:var(--sub);font-size:14.5px;line-height:1.7}
 .saved-empty .btn-p{display:inline-block}
+
+@media (max-width: 700px) {
+  .saved-wrap { padding-top: 16px }
+  .saved-head { flex-direction: column; align-items: flex-start; gap: 12px }
+  .saved-head h1 { font-size: 22px }
+  .saved-empty { padding: 50px 14px }
+}

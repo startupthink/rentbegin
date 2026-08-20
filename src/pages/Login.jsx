@@ -154,7 +154,7 @@ export default function Login() {
           {err && <p className="auth-err">{err}</p>}
           {msg && <p className="auth-ok">{msg}</p>}
 
-          <button className="btn-o auth-submit" disabled={busy}>
+          <button type="submit" className="btn-o auth-submit" disabled={busy}>
             {busy ? 'กำลังดำเนินการ…' : mode === 'login' ? 'เข้าสู่ระบบด้วยอีเมล' : 'สมัครด้วยอีเมล'}
           </button>
         </form>

@@ -27,6 +27,48 @@ export const AMENITIES = [
   { id: 'security',  label: 'รปภ. 24 ชม.',     icon: '🛡️' },
 ]
 
+// ประเภทประกาศ — เช่า / ขาย / ทั้งสอง
+export const LISTING_TYPES = [
+  { id: 'rent', label: 'ให้เช่า',      icon: '🔑', short: 'เช่า' },
+  { id: 'sale', label: 'ขาย',          icon: '🏷️', short: 'ขาย' },
+  { id: 'both', label: 'เช่าหรือขาย',  icon: '🤝', short: 'เช่า/ขาย' },
+]
+
+// ห้องและพื้นที่ใช้สอยภายใน
+export const ROOM_FEATURES = [
+  { id: 'living',   label: 'ห้องนั่งเล่น',   icon: '🛋️' },
+  { id: 'kitchen',  label: 'ห้องครัว',       icon: '🍳' },
+  { id: 'dining',   label: 'ห้องอาหาร',      icon: '🍽️' },
+  { id: 'balcony',  label: 'ระเบียง',        icon: '🌤️' },
+  { id: 'workroom', label: 'ห้องทำงาน',      icon: '💻' },
+  { id: 'laundry',  label: 'พื้นที่ซักล้าง', icon: '🧺' },
+  { id: 'storage',  label: 'ห้องเก็บของ',    icon: '📦' },
+  { id: 'maidroom', label: 'ห้องแม่บ้าน',    icon: '🚪' },
+  { id: 'garden',   label: 'สวน / พื้นที่นอกบ้าน', icon: '🌳' },
+  { id: 'garage',   label: 'โรงจอดรถในตัว',  icon: '🚗' },
+  { id: 'bathtub',  label: 'อ่างอาบน้ำ',     icon: '🛁' },
+  { id: 'waterheat',label: 'เครื่องทำน้ำอุ่น', icon: '🚿' },
+]
+
+// ช่วงราคาสำหรับตัวกรอง (บาท/เดือน)
+export const BUDGET_RANGES = [
+  { id: 'any',    label: 'ทุกงบ',            min: 0,     max: null },
+  { id: 'u10k',   label: 'ต่ำกว่า ฿10,000',  min: 0,     max: 10000 },
+  { id: '10-20k', label: '฿10,000 – 20,000', min: 10000, max: 20000 },
+  { id: '20-35k', label: '฿20,000 – 35,000', min: 20000, max: 35000 },
+  { id: '35-60k', label: '฿35,000 – 60,000', min: 35000, max: 60000 },
+  { id: 'o60k',   label: 'มากกว่า ฿60,000',  min: 60000, max: null },
+]
+
+export const BEDROOM_OPTIONS = [
+  { id: 'any', label: 'ไม่ระบุ', min: null },
+  { id: '0',   label: 'สตูดิโอ', min: 0 },
+  { id: '1',   label: '1 นอน+',  min: 1 },
+  { id: '2',   label: '2 นอน+',  min: 2 },
+  { id: '3',   label: '3 นอน+',  min: 3 },
+  { id: '4',   label: '4 นอน+',  min: 4 },
+]
+
 // สีพื้นหลังสำรอง — ใช้เมื่อประกาศยังไม่มีรูปจริง
 export const GRADIENTS = {
   g1: 'linear-gradient(140deg,#7bc6cc,#3a8fb7 60%,#2b5f8e)',

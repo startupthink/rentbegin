@@ -25,6 +25,32 @@ const buildNav = ({ review = 0, kyc = 0, disputes = 0 } = {}) => [
   { id: 'settings',  icon: '⚙️', label: 'ตั้งค่า' },
 ]
 
+// ส่งออกรายงานเป็น CSV — เปิดใน Excel/Numbers ได้
+function exportReport(stats, queue, disputes) {
+  const rows = [
+    ['รายงานสรุป Rentbegin', new Date().toLocaleString('th-TH')],
+    [],
+    ['ตัวชี้วัด', 'ค่า'],
+    ['สมาชิกทั้งหมด', stats?.totalMembers ?? 0],
+    ['ประกาศเปิดอยู่', stats?.activeListings ?? 0],
+    ['สัญญาที่ดำเนินอยู่', stats?.activeContracts ?? 0],
+    ['ค่าธรรมเนียมเดือนนี้', stats?.feesThisMonth ?? 0],
+    ['ประกาศรอตรวจ', queue?.length ?? 0],
+    ['ข้อพิพาทเปิดอยู่', disputes?.length ?? 0],
+    [],
+    ['ประกาศรอตรวจสอบ'],
+    ['รหัส', 'ชื่อ', 'รายละเอียด'],
+    ...(queue || []).map((q) => [q.id, q.title, q.meta]),
+  ]
+  const csv = '\uFEFF' + rows.map((r) => r.map((c) => `"${String(c ?? '').replace(/"/g, '""')}"`).join(',')).join('\n')
+  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `rentbegin-report-${new Date().toISOString().slice(0, 10)}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 const ADMIN_PROFILE = { name: 'ผู้ดูแลระบบ', initial: 'A', roleLabel: 'master', verified: false }
 const TONE = { live: 'tg-live', wait: 'tg-wait', danger: 'tg-danger', new: 'tg-new' }
 
@@ -96,7 +122,10 @@ function DashTab({ stats, queue, disputes, busy, handle, goTab }) {
     <>
       <div className="phead">
         <div><h2>แดชบอร์ด</h2><p>อัปเดตล่าสุดวันนี้ · มี {queue.length} ประกาศรอตรวจ</p></div>
-        <div className="phead-act"><button className="btn-o">↓ ส่งออกรายงาน</button><button className="btn-p">📢 ประกาศข่าว</button></div>
+        <div className="phead-act">
+          <button className="btn-o" onClick={() => exportReport(stats, queue, disputes)}>↓ ส่งออกรายงาน</button>
+          <button className="btn-p" onClick={() => goTab('members')}>👥 จัดการสมาชิก</button>
+        </div>
       </div>
 
       <div className="kpis">
@@ -204,22 +233,39 @@ function KycTab() {
 
 function DisputesTab({ initial }) {
   const [items, setItems] = useState(initial)
+  const [openId, setOpenId] = useState(null)
   const resolve = (id) => setItems((s) => s.filter((x) => x.id !== id))
   return (
     <>
       <div className="phead"><div><h2>ข้อพิพาท</h2><p>{items.length} เคสเปิดอยู่ · ไกล่เกลี่ยพร้อมหลักฐานในระบบ</p></div></div>
       <div className="pn">
         {items.length === 0 ? <div className="done-all">🎉 ไม่มีข้อพิพาทค้าง</div> : items.map((d) => (
-          <div className="lrow" key={d.id}>
-            <div className="info">
-              <div className="info-t">#{d.id} · {d.title}</div>
-              <div className="info-s">{d.detail}</div>
+          <div key={d.id}>
+            <div className="lrow">
+              <div className="info">
+                <div className="info-t">#{d.id} · {d.title}</div>
+                <div className="info-s">{d.detail}</div>
+              </div>
+              <div className="act">
+                <span className={`tg ${d.status === 'urgent' ? 'tg-danger' : 'tg-wait'}`}>{d.statusLabel}</span>
+                <button className="btn-o btn-s" onClick={() => setOpenId(openId === d.id ? null : d.id)}>
+                  {openId === d.id ? 'ปิด' : 'ดูรายละเอียด'}
+                </button>
+                <button className="btn-ok" onClick={() => resolve(d.id)}>ปิดเคส</button>
+              </div>
             </div>
-            <div className="act">
-              <span className={`tg ${d.status === 'urgent' ? 'tg-danger' : 'tg-wait'}`}>{d.statusLabel}</span>
-              <button className="btn-o btn-s">ดูหลักฐาน</button>
-              <button className="btn-ok" onClick={() => resolve(d.id)}>ปิดเคส</button>
-            </div>
+            {openId === d.id && (
+              <div className="contractbox">
+                <div className="dsp-r2" style={{ marginBottom: 10 }}>
+                  <b>รหัสเคส:</b> {d.id} · <b>สถานะ:</b> {d.statusLabel}
+                </div>
+                <div style={{ fontSize: 14, marginBottom: 12 }}>{d.detail}</div>
+                <p className="signnote">
+                  หลักฐานที่ระบบเก็บอัตโนมัติ: ประวัติแชตในระบบ · บันทึกการชำระเงิน · สถานะการจอง
+                  <br />ติดต่อคู่กรณีผ่านอีเมลที่ลงทะเบียนเพื่อไกล่เกลี่ยเพิ่มเติม
+                </p>
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -359,6 +405,7 @@ function AuditTab() {
 
 function SettingsTab() {
   const [saved, setSaved] = useState(false)
+  const [mode, setMode] = useState('strict')
   return (
     <>
       <div className="phead"><div><h2>ตั้งค่าระบบ</h2><p>ค่ากลางของแพลตฟอร์ม</p></div></div>
@@ -370,8 +417,12 @@ function SettingsTab() {
         </div>
         <div className="fr"><label>โหมดตรวจประกาศ</label>
           <div className="chips">
-            <button className="chip on">ตรวจก่อนเผยแพร่ทุกรายการ</button>
-            <button className="chip">เผยแพร่ทันที (สุ่มตรวจ)</button>
+            <button className={`chip ${mode === 'strict' ? 'on' : ''}`} onClick={() => setMode('strict')}>
+              ตรวจก่อนเผยแพร่ทุกรายการ
+            </button>
+            <button className={`chip ${mode === 'auto' ? 'on' : ''}`} onClick={() => setMode('auto')}>
+              เผยแพร่ทันที (สุ่มตรวจ)
+            </button>
           </div>
         </div>
         <button className="btn-p" onClick={() => { setSaved(true); setTimeout(() => setSaved(false), 3000) }}>บันทึก</button>

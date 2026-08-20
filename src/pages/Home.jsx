@@ -1,44 +1,97 @@
-import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useState, useCallback } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import Header from '../components/Header'
 import UserPanel from '../components/UserPanel'
 import PropertyCard from '../components/PropertyCard'
-import { PROPERTY_TYPES } from '../data/constants'
+import {
+  PROPERTY_TYPES, LISTING_TYPES, AMENITIES,
+  BUDGET_RANGES, BEDROOM_OPTIONS,
+} from '../data/constants'
 import { getListings } from '../api/client'
 import './Home.css'
 
+// ชิปกรองด่วน — map ไปยัง amenity จริงในฐานข้อมูล
+const QUICK_CHIPS = [
+  { id: 'bts',       label: 'ติดรถไฟฟ้า',   icon: '🚇' },
+  { id: 'furnished', label: 'เฟอร์ครบ',     icon: '🛋️' },
+  { id: 'pet',       label: 'เลี้ยงสัตว์ได้', icon: '🐾' },
+  { id: 'pool',      label: 'มีสระ',        icon: '🏊' },
+  { id: 'parking',   label: 'ที่จอดรถ',     icon: '🅿️' },
+  { id: 'gym',       label: 'ฟิตเนส',       icon: '🏋️' },
+]
+
 export default function Home() {
-  const [type, setType] = useState('all')
-  const [q, setQ] = useState('')
+  // ---------- อ่านตัวกรองจาก URL (แชร์ลิงก์ได้) ----------
+  const [params, setParams] = useSearchParams()
+  const type = params.get('type') || 'all'
+  const q = params.get('q') || ''
+  const listingType = params.get('for') || 'all'
+  const budgetId = params.get('budget') || 'any'
+  const bedroomId = params.get('bed') || 'any'
+  const chips = (params.get('chips') || '').split(',').filter(Boolean)
+
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
+  const [showFilter, setShowFilter] = useState(false)
+  const [form, setForm] = useState({ place: q, type, budget: budgetId })
 
-  const [form, setForm] = useState({
-    place: '',
-    type: 'condo',
-    budget: '฿10,000 – ฿20,000',
-  })
+  // อัปเดต URL — ตัวเดียวจบ ใช้ได้ทุกที่
+  const setParam = useCallback((patch) => {
+    const next = new URLSearchParams(params)
+    Object.entries(patch).forEach(([k, v]) => {
+      if (v === null || v === '' || v === 'all' || v === 'any') next.delete(k)
+      else next.set(k, v)
+    })
+    setParams(next, { replace: true })
+  }, [params, setParams])
 
   useEffect(() => {
     let alive = true
     setLoading(true)
-    getListings({ type, q })
+    const budget = BUDGET_RANGES.find((b) => b.id === budgetId) || BUDGET_RANGES[0]
+    const bed = BEDROOM_OPTIONS.find((b) => b.id === bedroomId) || BEDROOM_OPTIONS[0]
+
+    getListings({
+      type, q, listingType,
+      minPrice: budget.min || null,
+      maxPrice: budget.max,
+      minBedrooms: bed.min,
+      amenities: chips,
+    })
       .then((data) => { if (alive) setItems(data) })
+      .catch(() => { if (alive) setItems([]) })
       .finally(() => { if (alive) setLoading(false) })
     return () => { alive = false }
-  }, [type, q])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [type, q, listingType, budgetId, bedroomId, params.get('chips')])
 
   function doSearch(e) {
     e.preventDefault()
-    setQ(form.place)
-    setType(form.type)
+    setParam({ q: form.place, type: form.type, budget: form.budget })
   }
+
+  function toggleChip(id) {
+    const next = chips.includes(id) ? chips.filter((c) => c !== id) : [...chips, id]
+    setParam({ chips: next.join(',') })
+  }
+
+  function clearAll() {
+    setParams(new URLSearchParams(), { replace: true })
+    setForm({ place: '', type: 'all', budget: 'any' })
+    setShowFilter(false)
+  }
+
+  const activeFilterCount =
+    chips.length +
+    (budgetId !== 'any' ? 1 : 0) +
+    (bedroomId !== 'any' ? 1 : 0) +
+    (listingType !== 'all' ? 1 : 0)
 
   return (
     <>
       <Header />
 
-      {/* patch01: แถบหมวด fix ติดใต้ header ตลอดเวลา */}
+      {/* แถบหมวด sticky */}
       <div className="rail rail-sticky">
         <div className="rail-in">
           <div className="rail-scroll">
@@ -46,22 +99,84 @@ export default function Home() {
               <button
                 key={t.id}
                 className={`ftype ${type === t.id ? 'on' : ''}`}
-                onClick={() => setType(t.id)}
+                onClick={() => setParam({ type: t.id })}
               >
                 <span className="ic">{t.icon}</span>
                 {t.label}
               </button>
             ))}
-            <button className="ftype"><span className="ic">🚇</span>ติดรถไฟฟ้า</button>
-            <button className="ftype"><span className="ic">🛋️</span>เฟอร์ครบ</button>
-            <button className="ftype"><span className="ic">🐾</span>เลี้ยงสัตว์ได้</button>
-            <button className="ftype"><span className="ic">🏊</span>มีสระ</button>
+            {QUICK_CHIPS.map((c) => (
+              <button
+                key={c.id}
+                className={`ftype ${chips.includes(c.id) ? 'on' : ''}`}
+                onClick={() => toggleChip(c.id)}
+              >
+                <span className="ic">{c.icon}</span>
+                {c.label}
+              </button>
+            ))}
           </div>
-          <button className="fbtn">⚙ ตัวกรอง</button>
+          <button className={`fbtn ${activeFilterCount ? 'on' : ''}`} onClick={() => setShowFilter((v) => !v)}>
+            ⚙ ตัวกรอง{activeFilterCount ? ` (${activeFilterCount})` : ''}
+          </button>
         </div>
       </div>
 
-      {/* patch01: layout แบบ Facebook — แถบ user ซ้าย + เนื้อหาขวา */}
+      {/* แผงตัวกรองเพิ่มเติม */}
+      {showFilter && (
+        <div className="filterpanel">
+          <div className="fp-in">
+            <div className="fp-grp">
+              <label>ต้องการ</label>
+              <div className="fp-chips">
+                <button className={listingType === 'all' ? 'on' : ''} onClick={() => setParam({ for: 'all' })}>ทั้งหมด</button>
+                {LISTING_TYPES.filter((l) => l.id !== 'both').map((l) => (
+                  <button key={l.id} className={listingType === l.id ? 'on' : ''}
+                    onClick={() => setParam({ for: l.id })}>{l.icon} {l.label}</button>
+                ))}
+              </div>
+            </div>
+
+            <div className="fp-grp">
+              <label>งบต่อเดือน</label>
+              <div className="fp-chips">
+                {BUDGET_RANGES.map((b) => (
+                  <button key={b.id} className={budgetId === b.id ? 'on' : ''}
+                    onClick={() => setParam({ budget: b.id })}>{b.label}</button>
+                ))}
+              </div>
+            </div>
+
+            <div className="fp-grp">
+              <label>ห้องนอน</label>
+              <div className="fp-chips">
+                {BEDROOM_OPTIONS.map((b) => (
+                  <button key={b.id} className={bedroomId === b.id ? 'on' : ''}
+                    onClick={() => setParam({ bed: b.id })}>{b.label}</button>
+                ))}
+              </div>
+            </div>
+
+            <div className="fp-grp">
+              <label>สิ่งอำนวยความสะดวก</label>
+              <div className="fp-chips">
+                {AMENITIES.map((a) => (
+                  <button key={a.id} className={chips.includes(a.id) ? 'on' : ''}
+                    onClick={() => toggleChip(a.id)}>{a.icon} {a.label}</button>
+                ))}
+              </div>
+            </div>
+
+            <div className="fp-act">
+              <button className="btn-o" onClick={clearAll}>ล้างทั้งหมด</button>
+              <button className="btn-p" onClick={() => setShowFilter(false)}>
+                ดูผลลัพธ์ {items.length} รายการ
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="wrap home-body">
         <UserPanel />
 
@@ -75,7 +190,7 @@ export default function Home() {
               </div>
               <div className="hero-in">
                 <h1>บ้านหลังต่อไป เริ่มต้นที่นี่</h1>
-                <p>คอนโด บ้าน ทาวน์เฮาส์ ตึกแถว ที่ดิน — ตรงจากเจ้าของและนายหน้าที่ยืนยันตัวตนแล้ว</p>
+                <p>คอนโด บ้าน ทาวน์เฮาส์ ห้องแถว ตึกแถว ที่ดิน — เช่าและขาย ตรงจากเจ้าของและนายหน้า</p>
 
                 <form className="searchcard" onSubmit={doSearch}>
                   <div className="sf">
@@ -89,11 +204,8 @@ export default function Home() {
                   </div>
                   <div className="sf">
                     <label htmlFor="ptype">ประเภท</label>
-                    <select
-                      id="ptype"
-                      value={form.type}
-                      onChange={(e) => setForm({ ...form, type: e.target.value })}
-                    >
+                    <select id="ptype" value={form.type}
+                      onChange={(e) => setForm({ ...form, type: e.target.value })}>
                       {PROPERTY_TYPES.map((t) => (
                         <option key={t.id} value={t.id}>{t.label}</option>
                       ))}
@@ -101,17 +213,54 @@ export default function Home() {
                   </div>
                   <div className="sf">
                     <label htmlFor="budget">งบต่อเดือน</label>
-                    <input
-                      id="budget"
-                      value={form.budget}
-                      onChange={(e) => setForm({ ...form, budget: e.target.value })}
-                    />
+                    <select id="budget" value={form.budget}
+                      onChange={(e) => setForm({ ...form, budget: e.target.value })}>
+                      {BUDGET_RANGES.map((b) => (
+                        <option key={b.id} value={b.id}>{b.label}</option>
+                      ))}
+                    </select>
                   </div>
                   <button type="submit" className="sbtn">🔍 ค้นหา</button>
                 </form>
               </div>
             </div>
           </section>
+
+          {/* แสดงตัวกรองที่ใช้อยู่ */}
+          {(q || activeFilterCount > 0 || type !== 'all') && (
+            <div className="activefilters">
+              <span className="af-n">{loading ? 'กำลังค้นหา…' : `พบ ${items.length} รายการ`}</span>
+              {q && <span className="af-tag">ค้นหา: {q} <button onClick={() => { setParam({ q: '' }); setForm({ ...form, place: '' }) }}>✕</button></span>}
+              {type !== 'all' && (
+                <span className="af-tag">
+                  {PROPERTY_TYPES.find((t) => t.id === type)?.label}
+                  <button onClick={() => setParam({ type: 'all' })}>✕</button>
+                </span>
+              )}
+              {budgetId !== 'any' && (
+                <span className="af-tag">
+                  {BUDGET_RANGES.find((b) => b.id === budgetId)?.label}
+                  <button onClick={() => setParam({ budget: 'any' })}>✕</button>
+                </span>
+              )}
+              {bedroomId !== 'any' && (
+                <span className="af-tag">
+                  {BEDROOM_OPTIONS.find((b) => b.id === bedroomId)?.label}
+                  <button onClick={() => setParam({ bed: 'any' })}>✕</button>
+                </span>
+              )}
+              {chips.map((c) => {
+                const a = AMENITIES.find((x) => x.id === c) || QUICK_CHIPS.find((x) => x.id === c)
+                return (
+                  <span className="af-tag" key={c}>
+                    {a?.label || c}
+                    <button onClick={() => toggleChip(c)}>✕</button>
+                  </span>
+                )
+              })}
+              <button className="af-clear" onClick={clearAll}>ล้างทั้งหมด</button>
+            </div>
+          )}
 
           {loading ? (
             <div className="grid grid-3">
@@ -128,10 +277,8 @@ export default function Home() {
             <div className="empty">
               <div className="empty-ic">🔍</div>
               <h3>ไม่พบประกาศที่ตรงกับที่ค้นหา</h3>
-              <p>ลองเปลี่ยนทำเลหรือประเภททรัพย์ดู</p>
-              <button className="btn-o" onClick={() => { setQ(''); setType('all'); setForm({ ...form, place: '' }) }}>
-                ล้างตัวกรอง
-              </button>
+              <p>ลองเปลี่ยนทำเล ประเภททรัพย์ หรือขยายช่วงราคาดู</p>
+              <button className="btn-o" onClick={clearAll}>ล้างตัวกรอง</button>
             </div>
           ) : (
             <div className="grid grid-3">
@@ -155,7 +302,7 @@ export default function Home() {
 
       <footer className="ftr">
         <div className="ftr-in">
-          <span>© 2568 Rentbegin.com — ตลาดกลางเช่าอสังหาริมทรัพย์</span>
+          <span>© {new Date().getFullYear() + 543} Rentbegin.com — ตลาดกลางเช่าและขายอสังหาริมทรัพย์</span>
           <span className="ftr-links">
             <Link to="/saved">ที่บันทึกไว้</Link>
             <Link to="/member">สำหรับผู้ปล่อยเช่า</Link>

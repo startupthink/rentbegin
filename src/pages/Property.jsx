@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import Header from '../components/Header'
-import { AMENITIES } from '../data/constants'
+import Lightbox from '../components/Lightbox'
+import { AMENITIES, ROOM_FEATURES, LISTING_TYPES } from '../data/constants'
 import { photoStyle } from '../lib/photo'
 import { getListing, createBooking, calcBooking } from '../api/client'
 import { useSaved } from '../context/SavedContext'
@@ -24,6 +25,30 @@ export default function Property() {
   const [sent, setSent] = useState(false)
   const [bookingBusy, setBookingBusy] = useState(false)
   const [bookMsg, setBookMsg] = useState('')
+  const [lightbox, setLightbox] = useState(null)   // index รูปที่เปิดดูเต็มจอ
+  const [shared, setShared] = useState(false)
+
+  // ติดต่อเจ้าของ — โทรถ้ามีเบอร์, ไม่งั้นพาไปล็อกอินเพื่อแชต
+  function contactOwner() {
+    if (item?.contactPhone) { window.location.href = `tel:${item.contactPhone}`; return }
+    if (item?.contactLine) { window.open(`https://line.me/ti/p/~${item.contactLine.replace('@', '')}`, '_blank'); return }
+    if (!isAuthed) { nav('/login', { state: { from: `/property/${id}` } }); return }
+    nav('/member')
+  }
+
+  // แชร์ประกาศ — ใช้ Web Share บนมือถือ, คัดลอกลิงก์บนเดสก์ท็อป
+  async function doShare() {
+    const url = window.location.href
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: item?.title || 'Rentbegin', url })
+      } else {
+        await navigator.clipboard.writeText(url)
+        setShared(true)
+        setTimeout(() => setShared(false), 2200)
+      }
+    } catch { /* ผู้ใช้ยกเลิก — ไม่ต้องทำอะไร */ }
+  }
 
   // จองจริง — สร้างรายการใน DB แล้วไปจ่ายที่แดชบอร์ด
   async function handleBook() {
@@ -86,7 +111,13 @@ export default function Property() {
   const deposit = calc.deposit
   const total = calc.total
 
-  const amenityList = AMENITIES.filter((a) => item.amenities.includes(a.id))
+  const amenityList = AMENITIES.filter((a) => (item.amenities || []).includes(a.id))
+  const roomList = ROOM_FEATURES.filter((r) => (item.rooms || []).includes(r.id))
+  const forSale = item.listingType === 'sale' || item.listingType === 'both'
+  const forRent = item.listingType !== 'sale'
+  const listingBadge = LISTING_TYPES.find((l) => l.id === item.listingType)
+  // ถ้าไม่มีรูปเลย ใช้ gradient สำรองเพื่อไม่ให้แกลเลอรีว่าง
+  const gallery = item.photos?.length ? item.photos : ['g1', 'g6', 'g3']
 
   const facts = [
     { ic: '🛏️', k: 'ห้องนอน', v: item.bedrooms > 0 ? `${item.bedrooms} ห้อง` : 'สตูดิโอ' },
@@ -112,6 +143,9 @@ export default function Property() {
           <span>· {item.reviewCount} รีวิว ·</span>
           {item.verified && <span className="tg tg-live">✓ เจ้าของยืนยันตัวตนแล้ว</span>}
           <span>· {item.district} {item.province}</span>
+          {listingBadge && item.listingType !== 'rent' && (
+            <span className="tg tg-new">{listingBadge.icon} {listingBadge.label}</span>
+          )}
           <span className="dsub-right">
             <button
               className={`dsave ${isSaved(item.id) ? 'on' : ''}`}
@@ -119,17 +153,27 @@ export default function Property() {
             >
               {isSaved(item.id) ? '♥ บันทึกแล้ว' : '♡ บันทึก'}
             </button>
-            &nbsp;·&nbsp; ↗ แชร์
+            <button className="dsave" onClick={doShare}>
+              {shared ? '✓ คัดลอกลิงก์แล้ว' : '↗ แชร์'}
+            </button>
           </span>
         </div>
 
         <div className="gal">
-          {item.photos.slice(0, 5).map((p, i) => (
-            <div key={i} style={photoStyle(p)}>
-              {i === 0 && <span className="more">📷 ดูรูปทั้งหมด {item.photoCount} รูป</span>}
+          {gallery.slice(0, 5).map((p, i) => (
+            <div key={i} style={photoStyle(p)} className="gal-cell" onClick={() => setLightbox(i)}>
+              {i === 0 && (
+                <span className="more" onClick={(e) => { e.stopPropagation(); setLightbox(0) }}>
+                  📷 ดูรูปทั้งหมด {gallery.length} รูป
+                </span>
+              )}
             </div>
           ))}
         </div>
+
+        {lightbox !== null && (
+          <Lightbox photos={gallery} startIndex={lightbox} onClose={() => setLightbox(null)} />
+        )}
 
         <div className="dcols">
           <div>
@@ -155,10 +199,21 @@ export default function Property() {
 
             <div className="dsec">
               <h3>รายละเอียด</h3>
-              {item.description.split('\n\n').map((para, i) => (
+              {(item.description || 'เจ้าของยังไม่ได้ใส่รายละเอียด').split('\n\n').map((para, i) => (
                 <p key={i} className="desc">{para}</p>
               ))}
             </div>
+
+            {roomList.length > 0 && (
+              <div className="dsec">
+                <h3>ห้องและพื้นที่ใช้สอย</h3>
+                <div className="amen">
+                  {roomList.map((r) => (
+                    <div key={r.id}>{r.icon} {r.label}</div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {amenityList.length > 0 && (
               <div className="dsec">
@@ -173,12 +228,14 @@ export default function Property() {
             )}
 
             <div className="dsec">
-              <h3>เงื่อนไขการเช่า</h3>
+              <h3>{forRent ? 'เงื่อนไขการเช่า' : 'เงื่อนไข'}</h3>
               <div className="amen">
-                <div>📝 สัญญาขั้นต่ำ {item.minLeaseMonths} เดือน</div>
-                <div>💰 มัดจำ {item.depositMonths} เดือน + ล่วงหน้า {item.advanceMonths} เดือน</div>
+                {forRent && <div>📝 สัญญาขั้นต่ำ {item.minLeaseMonths} เดือน</div>}
+                {forRent && <div>💰 มัดจำ {item.depositMonths} เดือน + ล่วงหน้า {item.advanceMonths} เดือน</div>}
+                {forSale && item.salePrice && <div>🏷️ ราคาขาย ฿{Number(item.salePrice).toLocaleString()}</div>}
                 <div>💡 ค่าน้ำ-ไฟตามมิเตอร์จริง</div>
-                <div>🗓️ เข้าอยู่ได้ {item.availableFrom}</div>
+                <div>🗓️ {forRent ? 'เข้าอยู่ได้' : 'พร้อมโอน'} {item.availableFrom}</div>
+                {item.floorNo && <div>🏢 ชั้น {item.floorNo}{item.totalFloors ? ` จาก ${item.totalFloors} ชั้น` : ''}</div>}
               </div>
             </div>
 
@@ -192,12 +249,20 @@ export default function Property() {
           </div>
 
           <div className="booking">
-            <div className="bk-price">
-              <b>฿{item.price.toLocaleString()}</b>
-              <span>/ เดือน</span>
-            </div>
+            {forRent && (
+              <div className="bk-price">
+                <b>฿{Number(item.price || 0).toLocaleString()}</b>
+                <span>/ เดือน</span>
+              </div>
+            )}
+            {forSale && item.salePrice && (
+              <div className={`bk-price ${forRent ? 'bk-price-alt' : ''}`}>
+                <b>฿{Number(item.salePrice).toLocaleString()}</b>
+                <span>ราคาขาย</span>
+              </div>
+            )}
 
-            <div className="bkfield">
+            <div className="bkfield" hidden={!forRent}>
               <div className="bkrow">
                 <label htmlFor="movein">วันเข้าอยู่</label>
                 <input
@@ -235,13 +300,17 @@ export default function Property() {
             </div>
 
             <button className="bk-cta" onClick={() => setSent(true)} disabled={sent}>
-              {sent ? '✓ ส่งคำขอนัดชมแล้ว' : '📅 นัดชมห้อง'}
+              {sent ? '✓ ส่งคำขอนัดชมแล้ว' : '📅 นัดชมทรัพย์'}
             </button>
-            <button className="bk-book" onClick={handleBook} disabled={bookingBusy}>
-              {bookingBusy ? 'กำลังส่งคำขอ...' : '🔒 จองและวางมัดจำ'}
-            </button>
+            {forRent && (
+              <button className="bk-book" onClick={handleBook} disabled={bookingBusy}>
+                {bookingBusy ? 'กำลังส่งคำขอ...' : '🔒 จองและวางมัดจำ'}
+              </button>
+            )}
             {bookMsg && <p className={`bk-msg ${bookMsg.startsWith('✕') ? 'err' : ''}`}>{bookMsg}</p>}
-            <button className="bk-alt">💬 ทักแชตเจ้าของ</button>
+            <button className="bk-alt" onClick={contactOwner}>
+              {item.contactPhone ? '📞 ติดต่อเจ้าของ' : '💬 ทักแชตเจ้าของ'}
+            </button>
             <p className="bk-note">
               {sent ? 'เจ้าของจะติดต่อกลับภายใน 24 ชม.' : 'นัดชมฟรี · จองแล้วเงินมัดจำพักในระบบจนเข้าอยู่'}
             </p>

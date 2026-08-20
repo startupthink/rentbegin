@@ -91,10 +91,10 @@ export default function UserPanel() {
           <>
             {savedItems.map((l) => (
               <Link to={`/property/${l.id}`} className="up-mini" key={l.id}>
-                <div className="up-thumb" style={photoStyle(l.photos[0])} />
+                <div className="up-thumb" style={photoStyle(l.photos?.[0])} />
                 <div className="up-mini-t">
                   <div className="t">{l.title}</div>
-                  <div className="s">฿{l.price.toLocaleString()}/ด.</div>
+                  <div className="s">฿{Number(l.price || 0).toLocaleString()}/ด.</div>
                 </div>
               </Link>
             ))}
@@ -118,7 +118,7 @@ export default function UserPanel() {
               <div className="up-mini-t">
                 <div className="t">{l.title}</div>
                 <div className="s">
-                  ฿{l.price.toLocaleString()}/ด.
+                  ฿{Number(l.price || 0).toLocaleString()}/ด.
                   {l.views ? ` · ${l.views.toLocaleString()} วิว` : ''}
                 </div>
               </div>
@@ -133,10 +133,9 @@ export default function UserPanel() {
       {isAuthed && !isLister && (
         <div className="up-card">
           <div className="up-head"><h4>🎯 ที่ฉันกำลังหา</h4></div>
-          <div className="up-pref"><span>ทำเล</span><b>รัชดา · นนทบุรี</b></div>
-          <div className="up-pref"><span>งบ/เดือน</span><b>฿10,000 – 20,000</b></div>
-          <div className="up-pref"><span>ประเภท</span><b>คอนโด, ทาวน์เฮาส์</b></div>
-          <button className="up-more as-btn">แก้ไขเงื่อนไข</button>
+          <div className="up-pref"><span>ที่บันทึกไว้</span><b>{count} รายการ</b></div>
+          <div className="up-pref"><span>สถานะ</span><b>{profile?.verified ? 'ยืนยันแล้ว' : 'ยังไม่ยืนยัน'}</b></div>
+          <Link to="/" className="up-more as-btn">ค้นหาทรัพย์</Link>
         </div>
       )}
 

@@ -56,6 +56,33 @@
 .side-admin .back-home{color:#71767b}
 .side-admin .back-home:hover{background:rgba(255,255,255,.07);color:#fff}
 
+/* ---------- เมนูแนวนอนสำหรับมือถือ ---------- */
+.mnav{display:none}
+
 @media(max-width:1000px){
   .side{display:none}
+  .mnav{
+    display:block;position:sticky;top:0;z-index:40;
+    background:#fff;border-bottom:1px solid var(--line);
+  }
+  .mnav-admin{background:#1c1f23;border-bottom-color:#2c3036}
+  .mnav-scroll{
+    display:flex;gap:6px;overflow-x:auto;padding:9px 12px;
+    -webkit-overflow-scrolling:touch;scrollbar-width:none;
+  }
+  .mnav-scroll::-webkit-scrollbar{display:none}
+  .mnav-b{
+    display:flex;align-items:center;gap:6px;flex:none;white-space:nowrap;
+    padding:9px 13px;border-radius:999px;font-size:13px;font-weight:700;
+    color:var(--sub);background:var(--soft);transition:.15s;
+  }
+  .mnav-admin .mnav-b{background:#262a30;color:#9aa1a8}
+  .mnav-b.on{background:var(--brand);color:#fff}
+  .mnav-admin .mnav-b.on{background:var(--brand);color:#fff}
+  .mnav-b .i{font-size:15px}
+  .mnav-b .c{
+    background:rgba(0,0,0,.14);border-radius:999px;padding:1px 7px;
+    font-size:11px;font-weight:800;
+  }
+  .mnav-b.on .c{background:rgba(255,255,255,.28)}
 }

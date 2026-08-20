@@ -50,3 +50,13 @@
 .card .spec{font-size:13.5px;color:var(--sub);margin:1px 0 6px}
 .card .cost{font-size:15px;font-weight:700;margin:0}
 .card .cost span{font-weight:500;color:var(--sub)}
+
+@media (max-width: 700px) {
+  .card .r1 h3 { font-size: 14.5px }
+  .card .meta, .card .spec { font-size: 12.5px }
+  .card .cost { font-size: 15px }
+  .card .fav { width: 34px; height: 34px; font-size: 17px }
+}
+
+.pill.sale{background:#7b61ff;color:#fff}
+.pill.both{background:#00a6a0;color:#fff}

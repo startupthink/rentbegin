@@ -9,7 +9,7 @@ export default function PropertyCard({ item, preview = false }) {
   const { isSaved, toggle } = useSaved()
   const [slide, setSlide] = useState(0)
 
-  const photos = item.photos || ['g1']
+  const photos = item.photos?.length ? item.photos : ['g1']
   const fav = !preview && isSaved(item.id)
 
   function toggleFav(e) {
@@ -34,8 +34,12 @@ export default function PropertyCard({ item, preview = false }) {
       <div className="ph">
         <div className="bg" style={photoStyle(photos[slide])} />
 
-        {item.verified && <span className="pill verified">✓ ยืนยันแล้ว</span>}
-        {item.hot && !item.verified && <span className="pill hot">🔥 คนดูเยอะ</span>}
+        {item.listingType === 'sale' && <span className="pill sale">🏷️ ขาย</span>}
+        {item.listingType === 'both' && <span className="pill both">🤝 เช่า/ขาย</span>}
+        {item.verified && item.listingType !== 'sale' && item.listingType !== 'both' &&
+          <span className="pill verified">✓ ยืนยันแล้ว</span>}
+        {item.hot && !item.verified && !item.listingType?.match(/sale|both/) &&
+          <span className="pill hot">🔥 คนดูเยอะ</span>}
 
         <button
           className={`fav ${fav ? 'on' : ''}`}
@@ -71,7 +75,11 @@ export default function PropertyCard({ item, preview = false }) {
       </p>
       <p className="spec">{specs.join(' · ')}</p>
       <p className="cost">
-        ฿{item.price.toLocaleString()} <span>/ เดือน</span>
+        {item.listingType === 'sale' ? (
+          <>฿{Number(item.salePrice || item.price).toLocaleString()} <span>ขาย</span></>
+        ) : (
+          <>฿{Number(item.price || 0).toLocaleString()} <span>/ เดือน</span></>
+        )}
       </p>
     </div>
   )
